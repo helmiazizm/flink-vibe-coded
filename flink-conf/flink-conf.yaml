@@ -1,0 +1,2 @@
+security.module.factory.class: org.apache.flink.runtime.security.NoOpSecurityModuleFactory
+security.enabled: false

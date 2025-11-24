@@ -1,0 +1,70 @@
+services:
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root123
+      - MYSQL_DATABASE=testdb
+      - MYSQL_USER=flink
+      - MYSQL_PASSWORD=flink123
+    volumes:
+      - ./mysql-init:/docker-entrypoint-initdb.d
+      - mysql-data:/var/lib/mysql
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --server-id=1
+      --log-bin=mysql-bin
+      --binlog-format=ROW
+      --binlog-row-image=FULL
+      --gtid-mode=ON
+      --enforce-gtid-consistency=ON
+
+  jobmanager:
+    image: flink:1.18
+    ports:
+      - "8081:8081"
+    command: >
+      bash -c "
+        cp /tmp/jars/*.jar /opt/flink/lib/ &&
+        /docker-entrypoint.sh jobmanager
+      "
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+      - FLINK_CONF_DIR=/opt/flink/conf
+      - HADOOP_CONF_DIR=/opt/flink/conf
+    volumes:
+      - ./flink-storage:/opt/flink/storage
+      - ./paimon_warehouse:/opt/flink/storage/paimon_warehouse
+      - ./flink-jobs:/opt/flink/usrlibs
+      - ./jars:/tmp/jars
+      - ./hadoop-conf:/opt/hadoop-conf
+      - ./flink-conf:/opt/flink/conf
+    depends_on:
+      - mysql
+
+  taskmanager:
+    image: flink:1.18
+    depends_on:
+      - jobmanager
+      - mysql
+    command: >
+      bash -c "
+        cp /tmp/jars/*.jar /opt/flink/lib/ &&
+        /docker-entrypoint.sh taskmanager
+      "
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+      - FLINK_CONF_DIR=/opt/flink/conf
+      - SECURITY_MODULES=""
+      - FLINK_ENV_JAVA_OPTS="-Djava.security.krb5.conf=/dev/null"
+    volumes:
+      - ./flink-storage:/opt/flink/storage
+      - ./paimon_warehouse:/opt/flink/storage/paimon_warehouse
+      - ./flink-jobs:/opt/flink/usrlibs
+      - ./jars:/tmp/jars
+      - ./hadoop-conf:/opt/hadoop-conf
+      - ./flink-conf:/opt/flink/conf
+
+volumes:
+  mysql-data:
