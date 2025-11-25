@@ -32,27 +32,35 @@ help:
 
 # Set up everything from scratch
 setup:
-	@echo "🚀 Setting up Flink + MySQL + Paimon environment..."
-	@echo "Creating directories..."
+setup:
+	@echo "🚀 Setting up Flink 2.1.1 + MySQL 9.4 + Paimon 1.0.0 environment…"
+	@echo "Creating directories…"
 	mkdir -p jars mysql-init flink-jobs flink-storage backup
-	@echo "Downloading MySQL connector..."
-	cd jars && curl -s -O https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar
-	@echo "Downloading Flink JDBC connector..."
-	cd jars && curl -s -O https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc/3.1.1-1.18/flink-connector-jdbc-3.1.1-1.18.jar
-	@echo "Downloading Flink Debezium connector..."
-	cd jars && curl -s -O https://repo1.maven.org/maven2/org/apache/flink/flink-connector-debezium/2.3.0-1.17/flink-connector-debezium-2.3.0-1.17.jar
-	@echo "Downloading Debezium MySQL connector..."
-	cd jars && curl -s -O https://repo1.maven.org/maven2/io/debezium/debezium-connector-mysql/2.5.4.Final/debezium-connector-mysql-2.5.4.Final.jar
-	@echo "Downloading Paimon Flink connector..."
-	cd jars && curl -s -O https://repo1.maven.org/maven2/org/apache/paimon/paimon-flink-1.18/0.8.0/paimon-flink-1.18-0.8.0.jar
-	@echo "Downloading Hadoop dependencies..."
-	cd jars && curl -s -O https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-common/3.3.6/hadoop-common-3.3.6.jar
-	cd jars && curl -s -O https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.6/hadoop-aws-3.3.6.jar
-	@echo "Skipping JindoSDK download (uncomment in Makefile to enable)..."
-	# tar -xzf jindosdk-6.10.2-linux.tar.gz
-	# cp jindosdk-6.10.2-linux/lib/*.jar jars/
-	# cp jindosdk-6.10.2-linux/plugins/flink/*.jar jars/
-	# rm -rf jindosdk-6.10.2-linux jindosdk-6.10.2-linux.tar.gz
+
+	@echo "Downloading MySQL Connector/J (latest 9.4.x)…"
+	cd jars && curl -O https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/9.4.0/mysql-connector-j-9.4.0.jar
+
+	@echo "Downloading Flink JDBC connector (4.0.0 for Flink 2.x)…"
+	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc/4.0.0-2.0/flink-connector-jdbc-4.0.0-2.0.jar
+
+	@echo "Downloading Flink Debezium CDC connector (2.1.1, Ververica)…"
+	cd jars && curl -O https://repo1.maven.org/maven2/com/ververica/flink-connector-debezium/2.1.1/flink-connector-debezium-2.1.1.jar
+
+	@echo "Downloading Debezium MySQL connector (latest 3.3.x stable)…"
+	cd jars && curl -O https://repo1.maven.org/maven2/io/debezium/debezium-connector-mysql/3.3.1.Final/debezium-connector-mysql-3.3.1.Final.jar
+
+	@echo "Downloading Apache Paimon Flink connector (1.0.0 for Flink 2.x)…"
+	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/paimon/paimon-flink-2.1/1.3.1/paimon-flink-2.1-1.3.1.jar
+
+	@echo "Downloading OSS dependencies"
+	cd jars && curl -O https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-oss/1.3.1/paimon-oss-1.3.0.jar
+
+	@echo "Downloading S3 dependencies"
+	cd jars && curl -O https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-s3/1.3.0/paimon-s3-1.3.0.jar
+
+	@echo "✅ All JARs downloaded to ./jars"
+	@echo "Continue with MySQL init scripts and Flink jobs as before…"
+
 	@echo "Creating MySQL initialization script..."
 	echo "CREATE DATABASE IF NOT EXISTS testdb; USE testdb;" > mysql-init/init.sql
 	echo "CREATE TABLE IF NOT EXISTS users (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(100) NOT NULL, email VARCHAR(100) UNIQUE NOT NULL, age INT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP);" >> mysql-init/init.sql
@@ -82,9 +90,9 @@ setup:
 # Start all services
 start:
 	@echo "🚀 Starting all services..."
-	docker-compose up -d
+	docker compose up -d
 	@echo "⏳ Waiting for services to be ready..."
-	sleep 30
+	sleep 10
 	@echo "✅ Services started!"
 	@echo "🌐 Flink Web UI: http://localhost:8081"
 	@echo "📊 MySQL: localhost:3306 (user: flink, password: flink123)"
@@ -93,13 +101,13 @@ start:
 # Stop all services
 stop:
 	@echo "🛑 Stopping all services..."
-	docker-compose down
+	docker compose down
 	@echo "✅ Services stopped."
 
 # Restart all services
 restart:
 	@echo "🔄 Restarting all services..."
-	docker-compose restart
+	docker compose restart
 	@echo "⏳ Waiting for services to be ready..."
 	sleep 20
 	@echo "✅ Services restarted!"
@@ -108,14 +116,14 @@ restart:
 # Clean up everything
 clean:
 	@echo "🧹 Cleaning up environment..."
-	docker-compose down -v --remove-orphans
+	docker compose down -v --remove-orphans
 	docker system prune -f
 	rm -rf jars/* mysql-init/* flink-storage/* flink-jobs/* backup/*
 	@echo "✅ Environment cleaned."
 
 # Show logs for all services
 logs:
-	docker-compose logs -f
+	docker compose logs -f
 
 # Connect to MySQL shell
 mysql:
@@ -139,7 +147,7 @@ test:
 status:
 	@echo "📊 Service Status:"
 	@echo "=================="
-	docker-compose ps
+	docker compose ps
 	@echo ""
 	@echo "🌐 URLs:"
 	@echo "Flink Web UI: http://localhost:8081"
@@ -155,13 +163,6 @@ warehouse:
 data:
 	@echo "📝 Inserting sample data into Paimon tables..."
 	./final-paimon-test.sh
-
-# Download additional connectors
-download-connectors:
-	@echo "📦 Downloading additional connectors..."
-	cd jars && curl -s -O https://repo1.maven.org/maven2/org/apache/flink/flink-connector-kafka/3.0.1-1.18/flink-connector-kafka-3.0.1-1.18.jar
-	cd jars && curl -s -O https://repo1.maven.org/maven2/org/apache/flink/flink-connector-elasticsearch/3.0.1-1.18/flink-connector-elasticsearch-3.0.1-1.18.jar
-	@echo "✅ Additional connectors downloaded."
 
 # Backup data
 backup:
@@ -184,8 +185,8 @@ restore:
 # Development targets
 dev-setup: setup
 	@echo "🔧 Setting up development environment..."
-	docker-compose up -d
-	sleep 30
+	docker compose up -d
+	sleep 10
 	./final-paimon-test.sh
 	@echo "✅ Development environment ready!"
 
