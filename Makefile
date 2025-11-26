@@ -40,9 +40,6 @@ setup:
 	@echo "Downloading MySQL Connector/J (latest 9.4.x)…"
 	cd jars && curl -O https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/9.4.0/mysql-connector-j-9.4.0.jar
 
-	@echo "Downloading Flink JDBC connector (4.0.0 for Flink 2.x)…"
-	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc/4.0.0-2.0/flink-connector-jdbc-4.0.0-2.0.jar
-
 	@echo "Downloading Flink Debezium CDC connector (2.1.1, Ververica)…"
 	cd jars && curl -O https://repo1.maven.org/maven2/com/ververica/flink-connector-debezium/2.1.1/flink-connector-debezium-2.1.1.jar
 
@@ -53,10 +50,15 @@ setup:
 	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/paimon/paimon-flink-2.1/1.3.1/paimon-flink-2.1-1.3.1.jar
 
 	@echo "Downloading OSS dependencies"
-	cd jars && curl -O https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-oss/1.3.1/paimon-oss-1.3.0.jar
+	cd jars && curl -O https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-oss/1.3.1/paimon-oss-1.3.1.jar
 
 	@echo "Downloading S3 dependencies"
-	cd jars && curl -O https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-s3/1.3.0/paimon-s3-1.3.0.jar
+	cd jars && curl -O https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-s3/1.3.1/paimon-s3-1.3.1.jar
+
+	@echo "Downloading Hadoop dependencies"
+	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-hdfs-client/3.3.6/hadoop-hdfs-client-3.3.6.jar
+	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-common/3.3.6/hadoop-common-3.3.6.jar
+	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-hdfs/3.3.6/hadoop-hdfs-3.3.6.jar
 
 	@echo "✅ All JARs downloaded to ./jars"
 	@echo "Continue with MySQL init scripts and Flink jobs as before…"
