@@ -1,22 +1,4 @@
 services:
-  garage:
-    image: dxflrs/garage:v2.1.0
-    container_name: garage
-    ports:
-      - "9092:3900"  # External port 9092 → internal S3 API port 3900
-    environment:
-      RUST_LOG: garage=info
-    volumes:
-      - ./garage.toml:/etc/garage.toml
-      - garage-meta:/var/lib/garage/meta
-      - garage-data:/var/lib/garage/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "/garage", "status"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   mysql:
     image: mysql:8.0
     container_name: mysql
@@ -39,8 +21,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-    depends_on:
-      - garage
 
   jobmanager:
     build:
@@ -85,7 +65,71 @@ services:
       - jobmanager
     command: taskmanager
 
+  master:
+    image: chrislusf/seaweedfs:3.99
+    container_name: seaweedfs-master
+    command: master -ip=master -ip.bind=0.0.0.0
+    ports:
+      - "9092:9333"
+    volumes:
+      - ./seaweedfs/master-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9333/cluster/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  volume:
+    image: chrislusf/seaweedfs:3.99
+    container_name: seaweedfs-volume
+    command: volume -ip=volume -mserver=master:9333 -ip.bind=0.0.0.0 -port=8080
+    ports:
+      - "9093:8080"
+    volumes:
+      - ./seaweedfs/volume-data:/data
+    depends_on:
+      master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  filer:
+    image: chrislusf/seaweedfs:3.99
+    container_name: seaweedfs-filer
+    command: filer -ip=filer -master=master:9333 -ip.bind=0.0.0.0
+    ports:
+      - "9094:8888"
+    volumes:
+      - ./seaweedfs/filer-data:/data
+    depends_on:
+      master:
+        condition: service_healthy
+      volume:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8888/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  s3:
+    image: chrislusf/seaweedfs:3.99
+    container_name: seaweedfs-s3
+    command: s3 -filer=filer:8888 -ip.bind=0.0.0.0 -config=/etc/seaweedfs/s3-config.json
+    ports:
+      - "9095:8333"
+    volumes:
+      - ./seaweedfs/s3-config.json:/etc/seaweedfs/s3-config.json:ro
+    depends_on:
+      filer:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   mysql-data:
-  garage-meta:
-  garage-data:

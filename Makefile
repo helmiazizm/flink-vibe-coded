@@ -30,39 +30,33 @@ help:
 	@echo "  make query     # Query Paimon tables"
 	@echo "  make logs      # View service logs"
 
+setup-folders:
+	mkdir -p jars flink-storage backup mysql-init flink-jobs
+	mkdir -p seaweedfs/master-data seaweedfs/volume-data seaweedfs/filer-data 
+
 # Set up everything from scratch
-setup:
-setup:
-	@echo "🚀 Setting up Flink 2.1.1 + MySQL 9.4 + Paimon 1.0.0 environment…"
-	@echo "Creating directories…"
-	mkdir -p jars mysql-init flink-jobs flink-storage backup
-
-	@echo "Downloading MySQL Connector/J (latest 9.4.x)…"
+setup-jars: setup-folders
+	@echo "Downloading MySQL Connector/J (latest 9.4.x)"
 	cd jars && curl -O https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/9.4.0/mysql-connector-j-9.4.0.jar
+	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.5.0/flink-sql-connector-mysql-cdc-3.5.0.jar
+	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc/3.3.0-1.20/flink-connector-jdbc-3.3.0-1.20.jar
 
-	@echo "Downloading Flink Debezium CDC connector (2.1.1, Ververica)…"
-	cd jars && curl -O https://repo1.maven.org/maven2/com/ververica/flink-connector-debezium/2.1.1/flink-connector-debezium-2.1.1.jar
-
-	@echo "Downloading Debezium MySQL connector (latest 3.3.x stable)…"
-	cd jars && curl -O https://repo1.maven.org/maven2/io/debezium/debezium-connector-mysql/3.3.1.Final/debezium-connector-mysql-3.3.1.Final.jar
-
-	@echo "Downloading Apache Paimon Flink connector (1.0.0 for Flink 2.x)…"
+	@echo "Downloading Apache Paimon Flink connector"
 	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/paimon/paimon-flink-2.1/1.3.1/paimon-flink-2.1-1.3.1.jar
+	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-paimon/3.5.0/flink-cdc-pipeline-connector-paimon-3.5.0.jar
 
 	@echo "Downloading OSS dependencies"
 	cd jars && curl -O https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-oss/1.3.1/paimon-oss-1.3.1.jar
+	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/flink/flink-oss-fs-hadoop/2.1.1/flink-oss-fs-hadoop-2.1.1.jar
 
 	@echo "Downloading S3 dependencies"
 	cd jars && curl -O https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-s3/1.3.1/paimon-s3-1.3.1.jar
+	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/flink/flink-s3-fs-hadoop/2.1.1/flink-s3-fs-hadoop-2.1.1.jar
 
-	@echo "Downloading Hadoop dependencies"
-	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-hdfs-client/3.3.6/hadoop-hdfs-client-3.3.6.jar
-	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-common/3.3.6/hadoop-common-3.3.6.jar
-	cd jars && curl -O https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-hdfs/3.3.6/hadoop-hdfs-3.3.6.jar
+	@echo "? All JARs downloaded to ./jars"
+	@echo "Continue with MySQL init scripts and Flink jobs as before"
 
-	@echo "✅ All JARs downloaded to ./jars"
-	@echo "Continue with MySQL init scripts and Flink jobs as before…"
-
+setup-sql: setup-folders
 	@echo "Creating MySQL initialization script..."
 	echo "CREATE DATABASE IF NOT EXISTS testdb; USE testdb;" > mysql-init/init.sql
 	echo "CREATE TABLE IF NOT EXISTS users (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(100) NOT NULL, email VARCHAR(100) UNIQUE NOT NULL, age INT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP);" >> mysql-init/init.sql
@@ -87,41 +81,46 @@ setup:
 	echo "INSERT INTO orders VALUES (4, 3, 'Monitor', 1, 299.99, TIMESTAMP '2024-01-13 12:00:00');" >> flink-jobs/mysql-to-paimon.sql
 	echo "INSERT INTO orders VALUES (5, 4, 'Headphones', 1, 150.00, TIMESTAMP '2024-01-14 13:00:00');" >> flink-jobs/mysql-to-paimon.sql
 	echo "INSERT INTO orders VALUES (6, 5, 'USB Cable', 3, 10.00, TIMESTAMP '2024-01-15 14:00:00');" >> flink-jobs/mysql-to-paimon.sql
-	@echo "✅ Setup complete! Use 'make start' to begin."
+
+setup-s3: setup-folders
+	echo '{\n  "identities": [\n    {\n      "name": "admin",\n      "credentials": [\n        {\n          "accessKey": "admin",\n          "secretKey": "supersecret"\n        }\n      ],\n      "actions": ["Admin", "Read", "Write", "List", "Tagging"]\n    }\n  ]\n}' > seaweedfs/s3-config.json
+
+setup: setup-jars setup-sql
+	@echo "? Setup complete! Use 'make start' to begin."
 
 # Start all services
 start:
-	@echo "🚀 Starting all services..."
+	@echo "?? Starting all services..."
 	docker compose up -d
-	@echo "⏳ Waiting for services to be ready..."
+	@echo "? Waiting for services to be ready..."
 	sleep 10
-	@echo "✅ Services started!"
-	@echo "🌐 Flink Web UI: http://localhost:8081"
-	@echo "📊 MySQL: localhost:3306 (user: flink, password: flink123)"
+	@echo "? Services started!"
+	@echo "?? Flink Web UI: http://localhost:8081"
+	@echo "?? MySQL: localhost:3306 (user: flink, password: flink123)"
 	@make status
 
 # Stop all services
 stop:
-	@echo "🛑 Stopping all services..."
+	@echo "?? Stopping all services..."
 	docker compose down
-	@echo "✅ Services stopped."
+	@echo "? Services stopped."
 
 # Restart all services
 restart:
-	@echo "🔄 Restarting all services..."
+	@echo "?? Restarting all services..."
 	docker compose restart
-	@echo "⏳ Waiting for services to be ready..."
+	@echo "? Waiting for services to be ready..."
 	sleep 20
-	@echo "✅ Services restarted!"
+	@echo "? Services restarted!"
 	@make status
 
 # Clean up everything
 clean:
-	@echo "🧹 Cleaning up environment..."
+	@echo "?? Cleaning up environment..."
 	docker compose down -v --remove-orphans
 	docker system prune -f
 	rm -rf jars/* mysql-init/* flink-storage/* flink-jobs/* backup/*
-	@echo "✅ Environment cleaned."
+	@echo "? Environment cleaned."
 
 # Show logs for all services
 logs:
@@ -137,42 +136,42 @@ flink:
 
 # Query Paimon data
 query:
-	@echo "📊 Querying Paimon tables..."
+	@echo "?? Querying Paimon tables..."
 	docker exec -i flink_dev-jobmanager-1 /opt/flink/bin/sql-client.sh -c "SET sql-client.execution.result-mode=TABLEAU; CREATE CATALOG IF NOT EXISTS paimon_catalog WITH ('type' = 'paimon', 'warehouse' = 'file:///opt/flink/storage/paimon_warehouse'); USE CATALOG paimon_catalog; SHOW DATABASES;"
 
 # Run complete pipeline test
 test:
-	@echo "🧪 Running complete pipeline test..."
+	@echo "?? Running complete pipeline test..."
 	./final-paimon-test.sh
 
 # Show status of all services
 status:
-	@echo "📊 Service Status:"
+	@echo "?? Service Status:"
 	@echo "=================="
 	docker compose ps
 	@echo ""
-	@echo "🌐 URLs:"
+	@echo "?? URLs:"
 	@echo "Flink Web UI: http://localhost:8081"
 	@echo "MySQL: localhost:3306"
 
 # List Paimon warehouse contents
 warehouse:
-	@echo "📂 Paimon Warehouse Contents:"
+	@echo "?? Paimon Warehouse Contents:"
 	@echo "=========================="
 	docker exec flink_dev-jobmanager-1 find /opt/flink/storage/paimon_warehouse -type f -name "*.parquet" -exec ls -lh {} \; 2>/dev/null || echo "No data files found. Run 'make data' to create sample data."
 
 # Insert sample data into Paimon tables
 data:
-	@echo "📝 Inserting sample data into Paimon tables..."
+	@echo "?? Inserting sample data into Paimon tables..."
 	./final-paimon-test.sh
 
 # Backup data
 backup:
-	@echo "💾 Creating backup..."
+	@echo "?? Creating backup..."
 	mkdir -p backup
 	docker exec flink_dev-mysql-1 mysqldump -u flink -pflink123 testdb > backup/mysql-backup-`date +%Y%m%d-%H%M%S`.sql
 	docker cp flink_dev-jobmanager-1:/opt/flink/storage backup/paimon-warehouse-`date +%Y%m%d-%H%M%S`
-	@echo "✅ Backup created in backup/ directory."
+	@echo "? Backup created in backup/ directory."
 
 # Restore data from backup
 restore:
@@ -180,32 +179,32 @@ restore:
 		echo "Usage: make restore BACKUP=backup-file"; \
 		exit 1; \
 	fi
-	@echo "📥 Restoring from backup..."
+	@echo "?? Restoring from backup..."
 	docker exec -i flink_dev-mysql-1 mysql -u flink -pflink123 testdb < $(BACKUP)
-	@echo "✅ Data restored."
+	@echo "? Data restored."
 
 # Development targets
 dev-setup: setup
-	@echo "🔧 Setting up development environment..."
+	@echo "?? Setting up development environment..."
 	docker compose up -d
 	sleep 10
 	./final-paimon-test.sh
-	@echo "✅ Development environment ready!"
+	@echo "? Development environment ready!"
 
 # Production targets
 prod-deploy:
-	@echo "🚀 Deploying to production..."
-	@echo "⚠️  This is a placeholder for production deployment"
+	@echo "?? Deploying to production..."
+	@echo "??  This is a placeholder for production deployment"
 	@echo "Add your production deployment commands here"
 
 # Monitoring targets
 monitor:
-	@echo "📈 Opening monitoring dashboards..."
+	@echo "?? Opening monitoring dashboards..."
 	@echo "Flink UI: http://localhost:8081"
 	@if command -v open >/dev/null 2>&1; then open http://localhost:8081; else echo "Open http://localhost:8081 in your browser"; fi
 
 # Quick start (setup + start + data)
 quick: setup start data
-	@echo "🚀 Quick start complete!"
-	@echo "🌐 Flink Web UI: http://localhost:8081"
+	@echo "?? Quick start complete!"
+	@echo "?? Flink Web UI: http://localhost:8081"
 	@make status

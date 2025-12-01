@@ -1,1 +1,3 @@
-CREATE CATALOG paimon_catalog WITH ('type' = 'paimon', 'warehouse' = 's3://paimon-data/paimon_warehouse', 's3.endpoint' = 'http://garage:3900/', 's3.access-key' = 'GKd7defc6567a81f750a275a42', 's3.secret-key' = '51f25583b0e3c030a1460554285cc19f5b7ff480e8535165425878d2b1f30396');
+CREATE CATALOG paimon_catalog WITH ('type' = 'paimon', 'warehouse' = 's3://paimon-data/paimon_warehouse', 's3.endpoint' = 'http://seaweedfs-s3:8333/', 's3.access-key' = 'admin', 's3.secret-key' = 'supersecret', 's3.path.style.access' = 'true');
+
+CREATE TABLE my_table (user_id BIGINT, item_id BIGINT, behavior STRING, dt STRING, hh STRING, PRIMARY KEY (dt, hh, user_id) NOT ENFORCED);
