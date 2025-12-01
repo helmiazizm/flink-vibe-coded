@@ -22,6 +22,28 @@ services:
       timeout: 3s
       retries: 10
 
+  paimon-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: paimon-init
+    volumes:
+      - ./jars:/opt/flink/usrlib:Z
+      - ./flink-jobs/paimon-init.sql:/paimon-init.sql:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      jobmanager:
+        condition: service_started
+      s3:
+        condition: service_started
+    entrypoint: >
+      bash -c "sleep 15 && 
+               /opt/flink/bin/sql-client.sh < /paimon-init.sql &&
+               echo 'Paimon initialization completed' &&
+               exit 0"
+    restart: "no"
+
   jobmanager:
     build:
       context: .
