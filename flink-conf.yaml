@@ -1,4 +1,0 @@
-jobmanager.rpc.address: localhost
-jobmanager.rpc.port: 6123
-rest.address: localhost
-rest.port: 8081

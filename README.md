@@ -1,307 +1,181 @@
-# Flink + MySQL + Paimon Data Pipeline
+# Flink + MySQL + Paimon + SeaweedFS Stack
 
-A complete data pipeline solution using Apache Flink, MySQL, and Apache Paimon for real-time data processing and lakehouse storage.
+A Docker Compose-based data processing stack combining Apache Flink, MySQL CDC, Apache Paimon, and SeaweedFS for real-time data streaming and distributed storage.
 
 ## 🚀 Quick Start
 
 ```bash
-# Set up everything from scratch and start the pipeline
-make quick
-
-# Or step by step:
-make setup    # Download dependencies and create configuration
+make setup    # Initialize directories and build images
 make start    # Start all services
-make data     # Insert sample data into Paimon tables
-make query    # Query the Paimon tables
+make status   # Check service status
 ```
+
+Access:
+- **Flink Web UI**: http://localhost:8081
+- **MySQL**: localhost:3306 (user: `flink`, password: `flink123`)
 
 ## 📋 Prerequisites
 
 - Docker and Docker Compose
-- Make
-- Git (optional, for version control)
+- Make (on Linux/macOS) or compatible build tool
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────┐    ┌──────────────┐    ┌─────────────┐
-│   MySQL    │───▶│   Flink     │───▶│   Paimon   │
-│  (Source)  │    │ (Processing) │    │ (Lakehouse) │
-└─────────────┘    └──────────────┘    └─────────────┘
+MySQL                Flink                 Paimon              SeaweedFS
+(CDC Source)      (Stream Processor)    (Lakehouse)        (Storage)
+    │
+    ├─────────────▶ JobManager ─────────▶ Storage ◀──────── Master
+    │                   │                                     Volume
+    └─────────────────  TaskManager
 ```
 
-- **MySQL**: Source database with CDC (Change Data Capture) enabled
-- **Flink**: Stream processing engine for data transformation
-- **Paimon**: Lakehouse storage format for analytics
+## 🛠️ Services
 
-## 🛠️ Available Commands
+| Service | Port | Purpose |
+|---------|------|---------|
+| **MySQL** | 3306 | Source database with Change Data Capture enabled |
+| **Flink JobManager** | 8081 | Stream processing coordinator and web UI |
+| **Flink TaskManager** | - | Stream processing workers |
+| **SeaweedFS Master** | 9092 | Distributed storage master node |
+| **SeaweedFS Volume** | 9093 | Distributed storage volume node |
 
-### Setup & Management
+## 📚 Make Commands
+
+### Service Management
 ```bash
-make setup      # Set up entire environment from scratch
-make start      # Start all services (MySQL + Flink)
-make stop       # Stop all services
-make restart    # Restart all services
-make clean      # Clean up containers, volumes, and files
-make status     # Show status of all services
+make help      # Show all available commands
+make setup     # Initialize directories and build Docker images
+make start     # Start all services
+make stop      # Stop all services
+make restart   # Restart all services
+make status    # Show service status and access points
+make logs      # Follow real-time service logs
+make clean     # Clean up containers, volumes, and generated files
 ```
 
-### Data Operations
+### Access Services
 ```bash
-make data       # Insert sample data into Paimon tables
-make query      # Query Paimon tables and show results
-make test       # Run complete pipeline test
-make warehouse  # List Paimon warehouse contents
-```
-
-### Development & Debugging
-```bash
-make mysql      # Connect to MySQL shell
-make flink      # Connect to Flink SQL client
-make logs       # Show logs for all services
-```
-
-### Backup & Recovery
-```bash
-make backup     # Create backup of MySQL and Paimon data
-make restore    # Restore from backup (BACKUP=file)
-```
-
-### Advanced
-```bash
-make download-connectors  # Download additional Flink connectors
-make dev-setup           # Set up development environment
-make monitor             # Open monitoring dashboards
+make mysql     # Connect to MySQL shell
+make flink     # Open Flink SQL client
 ```
 
 ## 📂 Project Structure
 
 ```
 flink_dev/
-├── Makefile                 # Build automation
-├── docker-compose.yml       # Service orchestration
-├── jars/                   # Flink connectors and dependencies
-├── mysql-init/            # MySQL initialization scripts
-├── flink-jobs/           # Flink SQL job definitions
-├── flink-storage/        # Paimon warehouse storage
-└── backup/               # Data backups
+├── Makefile                    # Build automation
+├── docker-compose.yml          # Service orchestration
+├── Dockerfile                  # Custom Flink image
+├── jars/                       # Flink connectors and libraries
+├── mysql-init/                 # MySQL initialization scripts
+├── flink-storage/              # Paimon warehouse storage
+├── flink-conf.yaml             # Flink configuration
+├── hadoop-conf/                # Hadoop configuration
+└── seaweedfs/                  # SeaweedFS data directories
+    ├── master-data/
+    └── volume-data/
 ```
 
 ## 🔧 Configuration
 
-### MySQL Configuration
-- **Database**: `testdb`
-- **User**: `flink`
-- **Password**: `flink123`
-- **Port**: `3306`
-- **CDC**: Enabled with binlog
+### MySQL
+- **Root Password**: root123
+- **Database**: testdb
+- **User**: flink
+- **Password**: flink123
+- **CDC Enabled**: Yes (binlog enabled)
 
-### Flink Configuration
-- **JobManager**: `http://localhost:8081`
-- **TaskManager**: Auto-scaling
-- **SQL Client**: Interactive shell available
+### Flink
+- **Memory**: 2GB per JM/TM
+- **Task Slots**: 2 per TaskManager
+- **Checkpoint Dir**: `/tmp/flink-checkpoints`
 
-### Paimon Configuration
-- **Warehouse**: `file:///opt/flink/storage/paimon_warehouse`
+### Paimon
+- **Warehouse**: `/opt/flink/storage/paimon_warehouse`
 - **Format**: Parquet
-- **Mode**: Append-only for time-series data
+- **Write Mode**: Append-only
 
-## 📊 Data Schema
+## 💾 Data Schema
 
-### Users Table
-```sql
-CREATE TABLE users (
-    id INT PRIMARY KEY,
-    name STRING,
-    email STRING UNIQUE,
-    age INT,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
-);
-```
+MySQL source tables are configured in `mysql-init/`. Default schema includes:
 
-### Orders Table
-```sql
-CREATE TABLE orders (
-    id INT PRIMARY KEY,
-    user_id INT FOREIGN KEY REFERENCES users(id),
-    product_name STRING,
-    quantity INT,
-    price DECIMAL(10,2),
-    order_date TIMESTAMP
-);
-```
+- **users**: User profiles with timestamps
+- **orders**: Order records linked to users
 
-## 🌐 Access Points
+## 🔍 Example Workflows
 
-- **Flink Web UI**: http://localhost:8081
-- **MySQL Database**: `localhost:3306`
-- **Paimon Warehouse**: `/opt/flink/storage/paimon_warehouse`
-
-## 📝 Example Queries
-
-```sql
--- Set up Paimon catalog
-CREATE CATALOG paimon_catalog WITH (
-    'type' = 'paimon',
-    'warehouse' = 'file:///opt/flink/storage/paimon_warehouse'
-);
-
-USE CATALOG paimon_catalog;
-USE testdb;
-
--- Query users
-SELECT * FROM users ORDER BY created_at DESC;
-
--- Query orders with user information
-SELECT 
-    u.name as user_name,
-    u.email as user_email,
-    o.product_name,
-    o.quantity,
-    o.price,
-    o.order_date
-FROM orders o
-JOIN users u ON o.user_id = u.id
-ORDER BY o.order_date DESC;
-
--- Analytics queries
-SELECT 
-    COUNT(*) as total_orders,
-    SUM(price * quantity) as total_revenue,
-    AVG(price) as avg_order_value
-FROM orders;
-```
-
-## 🔍 Monitoring & Debugging
-
-### Check Service Status
+### 1. Check Service Status
 ```bash
-make status     # Show all running services
-docker ps       # Docker container status
+make status
 ```
 
-### View Logs
+### 2. Query MySQL
 ```bash
-make logs       # Follow all service logs
-docker-compose logs mysql    # MySQL logs only
-docker-compose logs jobmanager # Flink JobManager logs
+make mysql
+# In MySQL shell:
+SELECT * FROM testdb.users;
 ```
 
-### Check Data Files
+### 3. Access Flink SQL Client
 ```bash
-make warehouse  # List Paimon data files
-docker exec flink_dev-jobmanager-1 find /opt/flink/storage/paimon_warehouse -name "*.parquet"
+make flink
+# Create Paimon catalogs and tables as needed
+```
+
+### 4. Monitor Services
+```bash
+make logs      # Follow all logs
 ```
 
 ## 🚨 Troubleshooting
 
-### Common Issues
-
-1. **Port Conflicts**
-   ```bash
-   # Check if ports are in use
-   lsof -i :8081  # Flink UI
-   lsof -i :3306  # MySQL
-   ```
-
-2. **Memory Issues**
-   ```bash
-   # Increase Docker memory limits
-   docker-compose down
-   # Edit docker-compose.yml to add memory limits
-   docker-compose up -d
-   ```
-
-3. **Connector Issues**
-   ```bash
-   # Check available connectors
-   make flink
-   # In SQL client: SHOW CONNECTORS;
-   ```
-
-4. **Data Not Appearing**
-   ```bash
-   # Check Flink job status
-   make logs
-   # Look for job submission errors
-   ```
-
-### Reset Environment
+### Services won't start
 ```bash
-make clean     # Complete reset
-make setup     # Fresh setup
-make start     # Start services
+# Check for port conflicts
+docker compose down
+# Increase Docker memory/CPU resources
+make start
 ```
 
-## 🔗 Connectors & Extensions
-
-### Available Connectors
-- **MySQL CDC**: For real-time change data capture
-- **JDBC**: For batch data access
-- **Kafka**: For streaming data integration
-- **Elasticsearch**: For search indexing
-
-### Adding New Connectors
+### MySQL connection issues
 ```bash
-make download-connectors
-# Or manually:
-cd jars
-curl -O <connector-url>
-docker-compose restart
-```
-
-## 📈 Performance Tuning
-
-### Flink Configuration
-- **Parallelism**: Adjust based on data volume
-- **Memory**: Configure heap and off-heap memory
-- **Checkpointing**: Tune for exactly-once semantics
-
-### Paimon Optimization
-- **File Size**: Configure target file sizes
-- **Compaction**: Set up background compaction
-- **Partitioning**: Use appropriate partition keys
-
-## 🧪 Testing
-
-### Run Test Suite
-```bash
-make test       # Run complete pipeline test
-```
-
-### Test Data Generation
-```bash
-# Generate test data
 make mysql
-# In MySQL shell:
-INSERT INTO users (name, email, age) VALUES 
-('Test User', 'test@example.com', 30);
+# Should connect; if not, check logs:
+docker compose logs mysql
 ```
 
-## 📚 Documentation
+### Flink jobs not running
+```bash
+# Check JobManager logs
+docker compose logs jobmanager
+# Verify all services are healthy
+make status
+```
 
-- [Apache Flink Documentation](https://flink.apache.org/docs/)
-- [Apache Paimon Documentation](https://paimon.apache.org/docs/)
-- [MySQL CDC Documentation](https://debezium.io/documentation/connectors/mysql/)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
+### Clean slate
+```bash
+make clean     # Remove everything
+make setup     # Start fresh
+make start
+```
 
-## 🤝 Contributing
+## 📖 Documentation
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test with `make test`
-5. Submit a pull request
+- [Apache Flink](https://flink.apache.org/)
+- [Apache Paimon](https://paimon.apache.org/)
+- [SeaweedFS](https://github.com/seaweedfs/seaweedfs)
+- [Docker Compose](https://docs.docker.com/compose/)
 
-## 📄 License
+## 🔗 Resource Links
 
-This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
+| Service | URL | Purpose |
+|---------|-----|---------|
+| Flink Web UI | http://localhost:8081 | Job monitoring and management |
+| MySQL | localhost:3306 | Data source |
+| SeaweedFS Master | localhost:9092 | Distributed storage admin |
+| SeaweedFS Volume | localhost:9093 | Storage access |
 
-## 🆘 Support
+---
 
-For issues and questions:
-1. Check the troubleshooting section
-2. Review service logs with `make logs`
-3. Create an issue with detailed information
-4. Include environment details and error messages
+For more information about individual components, refer to their official documentation.
