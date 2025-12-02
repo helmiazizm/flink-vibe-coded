@@ -22,28 +22,6 @@ services:
       timeout: 3s
       retries: 10
 
-  paimon-init:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: paimon-init
-    volumes:
-      - ./jars:/opt/flink/usrlib:Z
-      - ./flink-jobs/paimon-init.sql:/paimon-init.sql:ro
-    depends_on:
-      mysql:
-        condition: service_healthy
-      jobmanager:
-        condition: service_started
-      s3:
-        condition: service_started
-    entrypoint: >
-      bash -c "sleep 15 && 
-               /opt/flink/bin/sql-client.sh < /paimon-init.sql &&
-               echo 'Paimon initialization completed' &&
-               exit 0"
-    restart: "no"
-
   jobmanager:
     build:
       context: .
@@ -152,6 +130,45 @@ services:
       filer:
         condition: service_healthy
     restart: unless-stopped
+
+  s3-init:
+    image: python:3.13-alpine
+    container_name: seaweedfs-s3-init
+    working_dir: /app
+    environment:
+      S3_ENDPOINT: http://seaweedfs-s3:8333
+      S3_CREDENTIALS_PATH: /app/s3-config.json
+    volumes:
+      - ./scripts/seaweedfs-bucket.py:/app/init_bucket.py
+      - ./seaweedfs/s3-config.json:/app/s3-config.json:ro
+    command: sh -c "pip install --no-cache-dir boto3 && python init_bucket.py"
+    depends_on:
+      s3:
+        condition: service_started
+
+  paimon-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: paimon-init
+    volumes:
+      - ./jars:/opt/flink/usrlib:Z
+      - ./flink-jobs/paimon-init.sql:/paimon-init.sql:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      jobmanager:
+        condition: service_started
+      s3:
+        condition: service_started
+      s3-init:
+        condition: service_completed_successfully
+    entrypoint: >
+      bash -c "sleep 15 && 
+               /opt/flink/bin/sql-client.sh < /paimon-init.sql &&
+               echo 'Paimon initialization completed' &&
+               exit 0"
+    restart: "no"
 
 volumes:
   mysql-data:

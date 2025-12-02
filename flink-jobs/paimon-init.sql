@@ -7,7 +7,7 @@ CREATE CATALOG IF NOT EXISTS paimon_catalog WITH (
   's3.endpoint' = 'http://seaweedfs-s3:8333',
   's3.access-key' = 'paimonAdmin123',
   's3.secret-key' = 'paimonSecretKey456789abcdef',
-  's3.path.style.access' = 'true'
+  's3.path-style-access' = 'true'
 );
 
 USE CATALOG paimon_catalog;

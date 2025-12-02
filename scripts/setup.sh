@@ -14,13 +14,13 @@ echo "=================================================="
 # Create directories
 echo ""
 echo "Creating directories..."
-mkdir -p jars mysql-init flink-jobs seaweedfs/master-data seaweedfs/volume-data flink-storage
+mkdir -p jars mysql-init flink-jobs seaweedfs/master-data seaweedfs/volume-data seaweedfs/filer-data flink-storage
 
 # Download JARs
 download_jars() {
     echo ""
     echo "Downloading Flink connectors and dependencies..."
-    echo "  - MySQL Connector/J..."
+    echo "  - MySQL connector..."
     cd jars && curl -sO https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/9.4.0/mysql-connector-j-9.4.0.jar
     
     echo "  - Flink MySQL CDC connector..."

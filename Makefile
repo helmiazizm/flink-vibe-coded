@@ -95,8 +95,8 @@ clean:
 	docker compose down -v --remove-orphans
 	@echo "Removing generated files..."
 	rm -rf jars/* mysql-init/* flink-jobs/*
-	sudo rm -rf seaweedfs/master-data/* seaweedfs/volume-data/*
+	sudo rm -rf seaweedfs/master-data/* seaweedfs/filer-data/* seaweedfs/volume-data/*
 	@echo "Environment cleaned."
 	rm -rf jars/* mysql-init/* flink-jobs/*
-	sudo rm -rf seaweedfs/master-data/* seaweedfs/volume-data/*
+	sudo rm -rf seaweedfs/master-data/* seaweedfs/filer-data/* seaweedfs/volume-data/*
 	@echo "Environment cleaned."
