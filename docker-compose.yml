@@ -21,6 +21,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - flink-net
 
   jobmanager:
     build:
@@ -31,21 +33,22 @@ services:
       - "8081:8081"
       - "6123:6123"
     environment:
-      FLINK_CLASSPATH: /opt/flink/usrlib/*:/opt/flink/lib/*
-      FLINK_PROPERTIES: |
+      - |
+        FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
         jobmanager.rpc.port: 6123
         jobmanager.memory.process.size: 2g
         taskmanager.numberOfTaskSlots: 2
         jobmanager.scheduler: Default
         cluster.fine-grained-resource-management.enabled: false
-        state.checkpoints.dir: file:///tmp/flink-checkpoints
     volumes:
       - ./jars:/opt/flink/usrlib:Z
     depends_on:
       mysql:
         condition: service_healthy
     command: jobmanager
+    networks:
+      - flink-net
 
   taskmanager:
     build:
@@ -53,8 +56,8 @@ services:
       dockerfile: Dockerfile
     container_name: taskmanager
     environment:
-      FLINK_CLASSPATH: /opt/flink/usrlib/*:/opt/flink/lib/*
-      FLINK_PROPERTIES: |
+      - | 
+        FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
         taskmanager.memory.process.size: 2g
         taskmanager.numberOfTaskSlots: 2
@@ -64,6 +67,8 @@ services:
     depends_on:
       - jobmanager
     command: taskmanager
+    networks:
+      - flink-net
 
   master:
     image: chrislusf/seaweedfs:3.99
@@ -79,6 +84,8 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    networks:
+      - flink-net
 
   volume:
     image: chrislusf/seaweedfs:3.99
@@ -97,6 +104,8 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    networks:
+      - flink-net
 
   filer:
     image: chrislusf/seaweedfs:3.99
@@ -117,6 +126,8 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    networks:
+      - flink-net
 
   s3:
     image: chrislusf/seaweedfs:3.99
@@ -130,6 +141,8 @@ services:
       filer:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - flink-net
 
   s3-init:
     image: python:3.13-alpine
@@ -145,6 +158,9 @@ services:
     depends_on:
       s3:
         condition: service_started
+    restart: "no"
+    networks:
+      - flink-net
 
   paimon-init:
     build:
@@ -169,6 +185,14 @@ services:
                echo 'Paimon initialization completed' &&
                exit 0"
     restart: "no"
+    networks:
+      - flink-net
 
 volumes:
   mysql-data:
+  hms-db:
+
+networks:
+  flink-net:
+    driver: bridge
+    name: flink-net

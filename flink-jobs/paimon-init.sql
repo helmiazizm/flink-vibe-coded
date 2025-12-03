@@ -42,40 +42,40 @@ CREATE TABLE IF NOT EXISTS orders (
   'write-mode' = 'append-only'
 );
 
--- CDC Source: MySQL users table
-CREATE TABLE IF NOT EXISTS mysql_users (
-  id INT,
-  name STRING,
-  email STRING,
-  age INT,
-  created_at TIMESTAMP(3),
-  updated_at TIMESTAMP(3),
-  PRIMARY KEY (id) NOT ENFORCED
-) WITH (
-  'connector' = 'mysql-cdc',
-  'hostname' = 'mysql',
-  'port' = '3306',
-  'username' = 'flink',
-  'password' = 'flink123',
-  'database-name' = 'testdb',
-  'table-name' = 'users'
-);
+-- -- CDC Source: MySQL users table
+-- CREATE TABLE IF NOT EXISTS mysql_users (
+--   id INT,
+--   name STRING,
+--   email STRING,
+--   age INT,
+--   created_at TIMESTAMP(3),
+--   updated_at TIMESTAMP(3),
+--   PRIMARY KEY (id) NOT ENFORCED
+-- ) WITH (
+--   'connector' = 'mysql-cdc',
+--   'hostname' = 'mysql',
+--   'port' = '3306',
+--   'username' = 'flink',
+--   'password' = 'flink123',
+--   'database-name' = 'testdb',
+--   'table-name' = 'users'
+-- );
 
--- CDC Source: MySQL orders table
-CREATE TABLE IF NOT EXISTS mysql_orders (
-  id INT,
-  user_id INT,
-  product_name STRING,
-  quantity INT,
-  price DECIMAL(10, 2),
-  order_date TIMESTAMP(3),
-  PRIMARY KEY (id) NOT ENFORCED
-) WITH (
-  'connector' = 'mysql-cdc',
-  'hostname' = 'mysql',
-  'port' = '3306',
-  'username' = 'flink',
-  'password' = 'flink123',
-  'database-name' = 'testdb',
-  'table-name' = 'orders'
-);
+-- -- -- CDC Source: MySQL orders table
+-- CREATE TABLE IF NOT EXISTS mysql_orders (
+--   id INT,
+--   user_id INT,
+--   product_name STRING,
+--   quantity INT,
+--   price DECIMAL(10, 2),
+--   order_date TIMESTAMP(3),
+--   PRIMARY KEY (id) NOT ENFORCED
+-- ) WITH (
+--   'connector' = 'mysql-cdc',
+--   'hostname' = 'mysql',
+--   'port' = '3306',
+--   'username' = 'flink',
+--   'password' = 'flink123',
+--   'database-name' = 'testdb',
+--   'table-name' = 'orders'
+-- );

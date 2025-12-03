@@ -1,3 +1,6 @@
 jars
 .env
-seaweedfs
+seaweedfs/filer-data
+seaweedfs/master-data
+seaweedfs/volume-data
+cdc-setup

@@ -1,0 +1,35 @@
+{
+  "identities": [
+    {
+      "name": "paimon-admin",
+      "credentials": [
+        {
+          "accessKey": "paimonAdmin123",
+          "secretKey": "paimonSecretKey456789abcdef"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging",
+        "Delete"
+      ]
+    },
+    {
+      "name": "flink-user",
+      "credentials": [
+        {
+          "accessKey": "flinkUser789",
+          "secretKey": "flinkUserSecret123456789xyz"
+        }
+      ],
+      "actions": [
+        "Read",
+        "Write",
+        "List"
+      ]
+    }
+  ]
+}
