@@ -4,3 +4,4 @@ seaweedfs/filer-data
 seaweedfs/master-data
 seaweedfs/volume-data
 cdc-setup
+flink-jobs/paimon-init-prod.sql

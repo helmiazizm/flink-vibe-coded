@@ -162,31 +162,59 @@ services:
     networks:
       - flink-net
 
-  paimon-init:
+  sql-gateway:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: paimon-init
+    container_name: flink-sql-gateway
+    ports:
+      - "10000:10000"
+    command: >
+      bash -c "./bin/sql-gateway.sh start-foreground 
+      -Dsql-gateway.endpoint.type=hiveserver2
+      -Dsql-gateway.endpoint.hiveserver2.thrift.host=0.0.0.0
+      -Dsql-gateway.endpoint.hiveserver2.thrift.port=10000
+      -Dhive.metastore.uris=thrift://hive-metastore:9083
+      -Djobmanager.rpc.address=jobmanager
+      -Drest.address=jobmanager
+      -Drest.port=8081"
     volumes:
       - ./jars:/opt/flink/usrlib:Z
-      - ./flink-jobs/paimon-init.sql:/paimon-init.sql:ro
     depends_on:
-      mysql:
+      - jobmanager
+      - hive-metastore
+
+  hive-metastore:
+    image: apache/hive:standalone-metastore-4.2.0
+    container_name: hive-metastore
+    ports:
+      - "9083:9083"
+    environment:
+      DATABASE_TYPE: postgres
+      DATABASE_DRIVER: org.postgresql.Driver
+      DATABASE_HOST: hive-metastore-db
+      DATABASE_PORT: 5432
+      DATABASE_DB: metastore
+      DATABASE_USER: hive
+      DATABASE_PASSWORD: hive123
+    depends_on:
+      hive-metastore-db:
         condition: service_healthy
-      jobmanager:
-        condition: service_started
-      s3:
-        condition: service_started
-      s3-init:
-        condition: service_completed_successfully
-    entrypoint: >
-      bash -c "sleep 15 && 
-               /opt/flink/bin/sql-client.sh < /paimon-init.sql &&
-               echo 'Paimon initialization completed' &&
-               exit 0"
-    restart: "no"
-    networks:
-      - flink-net
+
+  hive-metastore-db:
+    image: postgres:15
+    container_name: hive-metastore-db
+    environment:
+      POSTGRES_DB: metastore
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hive123
+    volumes:
+      - hms-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "hive"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   mysql-data:

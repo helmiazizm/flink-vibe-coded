@@ -20,12 +20,12 @@ CREATE TABLE IF NOT EXISTS users (
   name STRING,
   email STRING,
   age INT,
-  created_at TIMESTAMP(3),
-  updated_at TIMESTAMP(3),
+  created_at TIMESTAMP(4),
+  updated_at TIMESTAMP(4),
   PRIMARY KEY (id) NOT ENFORCED
 ) WITH (
-  'file.format' = 'parquet',
-  'write-mode' = 'append-only'
+  'metadata.iceberg.storage' = 'table-location',
+  'data-file.path-directory' = 'data'
 );
 
 -- Orders table in Paimon (stored in SeaweedFS S3)
@@ -35,47 +35,52 @@ CREATE TABLE IF NOT EXISTS orders (
   product_name STRING,
   quantity INT,
   price DECIMAL(10, 2),
+  order_date TIMESTAMP(4),
+  PRIMARY KEY (id) NOT ENFORCED
+) WITH (
+  'metadata.iceberg.storage' = 'table-location',
+  'data-file.path-directory' = 'data'
+);
+
+-- CDC Source: MySQL users table
+CREATE TEMPORARY TABLE IF NOT EXISTS mysql_users (
+  id INT,
+  name STRING,
+  email STRING,
+  age INT,
+  created_at TIMESTAMP(3),
+  updated_at TIMESTAMP(3),
+  PRIMARY KEY (id) NOT ENFORCED
+) WITH (
+  'connector' = 'mysql-cdc',
+  'hostname' = 'mysql',
+  'port' = '3306',
+  'username' = 'flink',
+  'password' = 'flink123',
+  'database-name' = 'testdb',
+  'table-name' = 'users',
+  'scan.startup.mode' = 'initial'
+);
+
+-- CDC Source: MySQL orders table
+CREATE TEMPORARY TABLE IF NOT EXISTS mysql_orders (
+  id INT,
+  user_id INT,
+  product_name STRING,
+  quantity INT,
+  price DECIMAL(10, 2),
   order_date TIMESTAMP(3),
   PRIMARY KEY (id) NOT ENFORCED
 ) WITH (
-  'file.format' = 'parquet',
-  'write-mode' = 'append-only'
+  'connector' = 'mysql-cdc',
+  'hostname' = 'mysql',
+  'port' = '3306',
+  'username' = 'flink',
+  'password' = 'flink123',
+  'database-name' = 'testdb',
+  'table-name' = 'orders',
+  'scan.startup.mode' = 'initial'
 );
 
--- -- CDC Source: MySQL users table
--- CREATE TABLE IF NOT EXISTS mysql_users (
---   id INT,
---   name STRING,
---   email STRING,
---   age INT,
---   created_at TIMESTAMP(3),
---   updated_at TIMESTAMP(3),
---   PRIMARY KEY (id) NOT ENFORCED
--- ) WITH (
---   'connector' = 'mysql-cdc',
---   'hostname' = 'mysql',
---   'port' = '3306',
---   'username' = 'flink',
---   'password' = 'flink123',
---   'database-name' = 'testdb',
---   'table-name' = 'users'
--- );
-
--- -- -- CDC Source: MySQL orders table
--- CREATE TABLE IF NOT EXISTS mysql_orders (
---   id INT,
---   user_id INT,
---   product_name STRING,
---   quantity INT,
---   price DECIMAL(10, 2),
---   order_date TIMESTAMP(3),
---   PRIMARY KEY (id) NOT ENFORCED
--- ) WITH (
---   'connector' = 'mysql-cdc',
---   'hostname' = 'mysql',
---   'port' = '3306',
---   'username' = 'flink',
---   'password' = 'flink123',
---   'database-name' = 'testdb',
---   'table-name' = 'orders'
--- );
+INSERT INTO users SELECT * FROM mysql_users;
+INSERT INTO orders SELECT * FROM mysql_orders;

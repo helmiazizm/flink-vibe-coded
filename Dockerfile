@@ -1,4 +1,4 @@
-FROM apache/flink:2.1.1-scala_2.12-java21
+FROM apache/flink:1.20.3-scala_2.12-java17
 
 USER root
 
@@ -10,5 +10,3 @@ RUN \
 COPY jars/* /opt/flink/lib/
 
 USER flink
-
-CMD ["jobmanager"]

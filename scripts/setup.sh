@@ -30,7 +30,7 @@ download_jars() {
     curl -sO https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc/3.3.0-1.20/flink-connector-jdbc-3.3.0-1.20.jar
     
     echo "  - Apache Paimon Flink connector..."
-    curl -sO https://repo1.maven.org/maven2/org/apache/paimon/paimon-flink-2.1/1.3.1/paimon-flink-2.1-1.3.1.jar
+    curl -sO https://repo1.maven.org/maven2/org/apache/paimon/paimon-flink-1.20/1.3.1/paimon-flink-1.20-1.3.1.jar
     
     echo "  - Flink CDC Paimon connector..."
     curl -sO https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-paimon/3.5.0/flink-cdc-pipeline-connector-paimon-3.5.0.jar
@@ -39,16 +39,19 @@ download_jars() {
     curl -sO https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-oss/1.3.1/paimon-oss-1.3.1.jar
     
     echo "  - Flink OSS FS Hadoop..."
-    curl -sO https://repo1.maven.org/maven2/org/apache/flink/flink-oss-fs-hadoop/2.1.1/flink-oss-fs-hadoop-2.1.1.jar
+    curl -sO https://repo1.maven.org/maven2/org/apache/flink/flink-oss-fs-hadoop/1.20.3/flink-oss-fs-hadoop-1.20.3.jar
     
     echo "  - Paimon S3 connector..."
     curl -sO https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-s3/1.3.1/paimon-s3-1.3.1.jar
     
     echo "  - Flink S3 FS Hadoop..."
-    curl -sO https://repo1.maven.org/maven2/org/apache/flink/flink-s3-fs-hadoop/2.1.1/flink-s3-fs-hadoop-2.1.1.jar
+    curl -sO https://repo1.maven.org/maven2/org/apache/flink/flink-s3-fs-hadoop/1.20.3/flink-s3-fs-hadoop-1.20.3.jar
     
     echo "  - Paimon Hadoop Uber..."
-    curl -sO https://repository.apache.org/content/groups/snapshots/org/apache/paimon/paimon-hadoop-uber/1.4-SNAPSHOT/paimon-hadoop-uber-1.4-20251201.003816-76.jar
+    curl -sO https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar
+
+    echo "  - Flink SQL connector Hive..."
+    curl -sO https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-hive-3.1.3_2.12/1.20.3/flink-sql-connector-hive-3.1.3_2.12-1.20.3.jar
 
     cd "$SCRIPT_DIR"
     echo "✓ All JARs downloaded to ./jars ($(du -sh jars | awk '{print $1}'))"
@@ -61,6 +64,11 @@ generate_mysql_sql() {
     cat > mysql-init/init.sql << 'EOF'
 CREATE DATABASE IF NOT EXISTS testdb;
 USE testdb;
+
+CREATE USER IF NOT EXISTS 'flink'@'%' IDENTIFIED BY 'flink123';
+
+GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT, SHOW VIEW ON *.* TO 'flink'@'%';
+FLUSH PRIVILEGES;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -98,6 +106,7 @@ INSERT INTO orders (user_id, product_name, quantity, price) VALUES
   (3, 'Monitor', 1, 299.99),
   (4, 'Headphones', 1, 150.00),
   (5, 'USB Cable', 3, 10.00);
+
 EOF
     echo "✓ MySQL SQL created at mysql-init/init.sql"
 }
@@ -129,12 +138,12 @@ CREATE TABLE IF NOT EXISTS users (
   name STRING,
   email STRING,
   age INT,
-  created_at TIMESTAMP(3),
-  updated_at TIMESTAMP(3),
+  created_at TIMESTAMP(4),
+  updated_at TIMESTAMP(4),
   PRIMARY KEY (id) NOT ENFORCED
 ) WITH (
-  'file.format' = 'parquet',
-  'write-mode' = 'append-only'
+  'metadata.iceberg.storage' = 'table-location',
+  'data-file.path-directory' = 'data'
 );
 
 -- Orders table in Paimon (stored in SeaweedFS S3)
@@ -144,15 +153,15 @@ CREATE TABLE IF NOT EXISTS orders (
   product_name STRING,
   quantity INT,
   price DECIMAL(10, 2),
-  order_date TIMESTAMP(3),
+  order_date TIMESTAMP(4),
   PRIMARY KEY (id) NOT ENFORCED
 ) WITH (
-  'file.format' = 'parquet',
-  'write-mode' = 'append-only'
+  'metadata.iceberg.storage' = 'table-location',
+  'data-file.path-directory' = 'data'
 );
 
 -- CDC Source: MySQL users table
-CREATE TABLE IF NOT EXISTS mysql_users (
+CREATE TEMPORARY TABLE IF NOT EXISTS mysql_users (
   id INT,
   name STRING,
   email STRING,
@@ -167,11 +176,12 @@ CREATE TABLE IF NOT EXISTS mysql_users (
   'username' = 'flink',
   'password' = 'flink123',
   'database-name' = 'testdb',
-  'table-name' = 'users'
+  'table-name' = 'users',
+  'scan.startup.mode' = 'initial'
 );
 
 -- CDC Source: MySQL orders table
-CREATE TABLE IF NOT EXISTS mysql_orders (
+CREATE TEMPORARY TABLE IF NOT EXISTS mysql_orders (
   id INT,
   user_id INT,
   product_name STRING,
@@ -186,8 +196,12 @@ CREATE TABLE IF NOT EXISTS mysql_orders (
   'username' = 'flink',
   'password' = 'flink123',
   'database-name' = 'testdb',
-  'table-name' = 'orders'
+  'table-name' = 'orders',
+  'scan.startup.mode' = 'initial'
 );
+
+INSERT INTO users SELECT * FROM mysql_users;
+INSERT INTO orders SELECT * FROM mysql_orders;
 EOF
     echo "✓ Paimon SQL created at flink-jobs/paimon-init.sql"
 }
