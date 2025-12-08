@@ -42,3 +42,4 @@ INSERT INTO orders (user_id, product_name, quantity, price) VALUES
   (3, 'Monitor', 1, 299.99),
   (4, 'Headphones', 1, 150.00),
   (5, 'USB Cable', 3, 10.00);
+
