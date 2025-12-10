@@ -30,7 +30,7 @@ services:
       dockerfile: Dockerfile
     container_name: jobmanager
     ports:
-      - "8081:8081"
+      - "8080:8081"
       - "6123:6123"
     environment:
       - |
@@ -38,7 +38,6 @@ services:
         jobmanager.rpc.address: jobmanager
         jobmanager.rpc.port: 6123
         jobmanager.memory.process.size: 2g
-        taskmanager.numberOfTaskSlots: 2
         jobmanager.scheduler: Default
         cluster.fine-grained-resource-management.enabled: false
     volumes:
@@ -54,13 +53,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: taskmanager
     environment:
       - | 
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
         taskmanager.memory.process.size: 2g
-        taskmanager.numberOfTaskSlots: 2
         cluster.fine-grained-resource-management.enabled: false
     volumes:
       - ./jars:/opt/flink/usrlib:Z
@@ -69,6 +66,8 @@ services:
     command: taskmanager
     networks:
       - flink-net
+    deploy:
+      replicas: 3
 
   master:
     image: chrislusf/seaweedfs:3.99
@@ -168,11 +167,13 @@ services:
       dockerfile: Dockerfile
     container_name: flink-sql-gateway
     ports:
-      - "8083:8083"
+      - "8081:8083"
     command: >
       bash -c "./bin/sql-gateway.sh start-foreground 
       -Dsql-gateway.endpoint.rest.address=0.0.0.0 
       -Dsql-gateway.endpoint.rest.port=8083
+      -Dsql-gateway.session.idle-timeout=2h
+      -Dsql-gateway.session.check-interval=30min
       -Djobmanager.rpc.address=jobmanager
       -Drest.address=jobmanager
       -Drest.port=8081"
