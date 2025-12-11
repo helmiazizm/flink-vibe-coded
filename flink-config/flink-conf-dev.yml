@@ -19,6 +19,20 @@ execution:
     mode: "EXACTLY_ONCE"
     externalized-checkpoint-retention: "RETAIN_ON_CANCELLATION"
 
+# High Availability Configuration with Zookeeper
+high-availability:
+  type: "zookeeper"
+  storageDir: "s3://flink-state-persistent/ha/"
+  zookeeper:
+    quorum: "zookeeper:2181"
+    path:
+      root: "/flink"
+    client:
+      session-timeout: "60s"
+      connection-timeout: "15s"
+      retry-wait: "5s"
+      max-retry-attempts: 3
+
 s3:
   endpoint: "http://seaweedfs-s3:8333"
   access-key: "paimonAdmin123"

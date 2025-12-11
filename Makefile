@@ -14,7 +14,7 @@
         start-dev start-prod start-hive stop-dev stop-prod stop-hive \
         restart-dev restart-prod restart-hive \
         status status-hive logs logs-follow logs-service \
-        mysql flink sql-gateway hive-gateway \
+        mysql flink sql-gateway hive-gateway zookeeper \
         clean clean-soft
 
 # Default target - show help
@@ -63,6 +63,7 @@ help:
 	@echo "  make flink             Open Flink SQL client (interactive)"
 	@echo "  make sql-gateway       Test SQL Gateway connection (REST API)"
 	@echo "  make hive-gateway      Test HiveServer2 Gateway (Hive mode only)"
+	@echo "  make zookeeper         Check Zookeeper status and HA nodes"
 	@echo ""
 	@echo "🧹 CLEANUP"
 	@echo "  make clean             Full cleanup (containers + volumes + files)"
@@ -70,6 +71,7 @@ help:
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  Services:"
+	@echo "    • Zookeeper:         localhost:2181 (HA coordination)"
 	@echo "    • Flink Web UI:      http://localhost:8080"
 	@echo "    • Flink SQL Gateway: http://localhost:8081"
 	@echo "    • MySQL:             localhost:3306 (user: flink / flink123)"
@@ -182,6 +184,7 @@ status-hive:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  Hive Access Points"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  🔷 Zookeeper:          localhost:2181 (HA coordination)"
 	@echo "  🌐 Flink Web UI:       http://localhost:8081"
 	@echo "  🐝 HiveServer2:        jdbc:hive2://localhost:10000"
 	@echo "  🗄️  Hive Metastore:     thrift://localhost:9083"
@@ -205,6 +208,7 @@ status:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  Access Points"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  🔷 Zookeeper:         localhost:2181 (HA coordination)"
 	@echo "  🌐 Flink Web UI:      http://localhost:8080"
 	@echo "  🔌 Flink SQL Gateway: http://localhost:8081"
 	@echo "  🗄️  MySQL:             mysql -h localhost -P 3306 -u flink -pflink123 testdb"
@@ -256,6 +260,16 @@ hive-gateway:
 	@which beeline > /dev/null 2>&1 && \
 		beeline -u jdbc:hive2://localhost:10000 -e "SHOW DATABASES;" || \
 		echo "❌ beeline not found. Install with: brew install hive (macOS) or apt install hive (Linux)"
+
+zookeeper:
+	@echo "🔷 Checking Zookeeper status..."
+	@docker exec -it zookeeper bash -c "echo ruok | nc localhost 2181" 2>/dev/null && \
+		echo "✓ Zookeeper is healthy" || \
+		echo "❌ Zookeeper is not responding"
+	@echo ""
+	@echo "📋 Flink HA nodes in Zookeeper:"
+	@docker exec -it zookeeper zkCli.sh ls /flink 2>/dev/null | grep -v "Connecting\|WATCHER\|WatchedEvent" || \
+		echo "❌ Cannot connect to Zookeeper or /flink path doesn't exist"
 
 # ============================================================================
 # CLEANUP

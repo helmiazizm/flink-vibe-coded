@@ -3,9 +3,9 @@
 A production-ready Apache Flink data platform with MySQL CDC, Apache Paimon lakehouse, and SeaweedFS S3-compatible storage. Features built-in checkpointing, exactly-once semantics, and Python API for interactive development.
 
 **Three Deployment Options:**
-- **Development**: Full stack with MySQL CDC, 3 TaskManagers, REST SQL Gateway (Java 17)
-- **Production**: External S3, scalable TaskManagers, production-grade configs (Java 17)
-- **Hive**: Legacy compatibility with HiveServer2, Hive Metastore, JDBC support (Java 8)
+- **Development**: Full stack with MySQL CDC, 3 TaskManagers, REST SQL Gateway, Zookeeper HA (Java 17)
+- **Production**: External S3, scalable TaskManagers, production-grade configs, Zookeeper HA (Java 17)
+- **Hive**: Legacy compatibility with HiveServer2, Hive Metastore, JDBC support, Zookeeper HA (Java 8)
 
 ## Quick Start
 
@@ -29,10 +29,10 @@ make status-hive       # Check Hive status
 
 **Access Points:**
 
-| Environment | Flink UI | SQL Gateway | MySQL | SeaweedFS S3 |
-|------------|----------|-------------|-------|--------------|
-| **Dev/Prod** | :8080 | REST :8081 | :3306 | :9095 |
-| **Hive** | :8081 | HiveServer2 :10000 | :3306 | :9095 |
+| Environment | Zookeeper | Flink UI | SQL Gateway | MySQL | SeaweedFS S3 |
+|------------|-----------|----------|-------------|-------|--------------|
+| **Dev/Prod** | :2181 | :8080 | REST :8081 | :3306 | :9095 |
+| **Hive** | :2181 | :8081 | HiveServer2 :10000 | :3306 | :9095 |
 
 ## Prerequisites
 
@@ -52,9 +52,10 @@ make status-hive       # Check Hive status
 └─────────────┘      │  TaskManager (3) │      └─────────────┘      │   + Filer    │
                      │  SQL Gateway     │                           └──────────────┘
                      └──────────────────┘
-                              │
-                    Checkpoints & Savepoints
-                    (S3 with RocksDB backend)
+                              │                  ┌──────────────┐
+                    Checkpoints & Savepoints     │  Zookeeper   │
+                    (S3 with RocksDB backend) ◀──│     HA       │
+                                                 └──────────────┘
 ```
 
 ### Hive Architecture (Java 8)
@@ -65,9 +66,10 @@ make status-hive       # Check Hive status
 └─────────────┘      │  TaskManager (1) │      └──────────────────┘      │   + Filer    │
                      │  HiveServer2     │                                 └──────────────┘
                      └──────────────────┘
-                              │
-                    Hive Tables & Metadata
-                    (Thrift protocol)
+                              │                  ┌──────────────┐
+                    Hive Tables & Metadata       │  Zookeeper   │
+                    (Thrift protocol)         ◀──│     HA       │
+                                                 └──────────────┘
 ```
 
 ## Services Overview
@@ -75,6 +77,7 @@ make status-hive       # Check Hive status
 ### Standard Environment (Dev/Prod)
 | Service | Port | Purpose |
 |---------|------|---------|
+| **Zookeeper** | 2181 | High availability coordination |
 | **MySQL** | 3306 | CDC-enabled source database (GTID, binlog) |
 | **Flink JobManager** | 8080 | Job coordination and Web UI |
 | **Flink TaskManager** | - | 3 worker nodes (2GB each) |
@@ -87,6 +90,7 @@ make status-hive       # Check Hive status
 ### Hive Environment (Java 8)
 | Service | Port | Purpose |
 |---------|------|---------|
+| **Zookeeper** | 2181 | High availability coordination |
 | **MySQL** | 3306 | CDC-enabled source database (GTID, binlog) |
 | **Flink JobManager** | 8081 | Job coordination and Web UI (Java 8) |
 | **Flink TaskManager** | - | 1 worker node (2GB) |
@@ -190,6 +194,7 @@ flink_dev/
 | **Flink Version** | 1.20.3 | 1.20.3 | 1.20.3 |
 | **TaskManagers** | 3 | 3 | 1 |
 | **SQL Gateway** | REST API | REST API | HiveServer2 |
+| **High Availability** | ✅ Zookeeper | ✅ Zookeeper | ✅ Zookeeper |
 | **MySQL CDC** | ✅ Included | ❌ External | ✅ Included |
 | **Storage** | SeaweedFS S3 | External S3 | SeaweedFS S3 |
 | **Metastore** | N/A | N/A | Hive + PostgreSQL |
@@ -214,6 +219,34 @@ flink_dev/
 - Hive Metastore with PostgreSQL backend
 - Compatible with traditional Hive clients (beeline, JDBC drivers)
 - Single TaskManager (suitable for Hive query workloads)
+
+### High Availability Configuration
+
+All environments include Zookeeper for high availability:
+
+**Zookeeper Setup:**
+- **Version**: 3.9.3
+- **Port**: 2181
+- **Quorum**: Single node (suitable for dev/test)
+- **HA Storage**: S3-compatible filesystem
+- **ZNode Path**: `/flink`
+
+**Benefits:**
+- **JobManager Failover**: Automatic recovery from JobManager failures
+- **Leader Election**: Only one active JobManager at a time
+- **Metadata Storage**: Job graphs and completed checkpoints stored in Zookeeper
+- **TaskManager Recovery**: TaskManagers reconnect to new JobManager after failover
+
+**Configuration:**
+```yaml
+high-availability:
+  type: "zookeeper"
+  storageDir: "s3://flink-state-persistent/ha/"
+  zookeeper:
+    quorum: "zookeeper:2181"
+    path:
+      root: "/flink"
+```
 
 ### Checkpointing Configuration
 
@@ -366,6 +399,26 @@ sql("""
 """, table="user_summary")
 ```
 
+#### 6. Test High Availability
+```bash
+# Check Zookeeper health
+make zookeeper
+
+# Start a Flink job
+make flink
+# In SQL client: CREATE TABLE test AS SELECT 1;
+
+# Simulate JobManager failure
+docker stop jobmanager
+
+# Watch automatic recovery
+docker logs -f jobmanager
+
+# Verify job continues after restart
+docker start jobmanager
+# Job should resume from last checkpoint
+```
+
 ### Hive Environment Workflows
 
 #### 1. Start Hive Environment
@@ -493,6 +546,22 @@ docker compose logs taskmanager | grep -i cdc
 import requests
 response = requests.get("http://localhost:8081/v1/info")
 print(response.json())
+```
+
+### Zookeeper connection issues
+```bash
+# Check Zookeeper status
+docker exec -it zookeeper bash -c "echo ruok | nc localhost 2181"
+# Should respond with: imok
+
+# View Zookeeper logs
+docker logs zookeeper
+
+# Check Flink HA znodes
+docker exec -it zookeeper zkCli.sh ls /flink
+
+# Test from Flink container
+docker exec -it jobmanager bash -c "nc -zv zookeeper 2181"
 ```
 
 ### Hive Metastore connection issues

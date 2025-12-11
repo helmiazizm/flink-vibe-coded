@@ -1,4 +1,24 @@
 services:
+  zookeeper:
+    image: zookeeper:3.9.3
+    container_name: zookeeper
+    hostname: zookeeper
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_SERVERS: server.1=zookeeper:2888:3888;2181
+      ZOO_4LW_COMMANDS_WHITELIST: "*"
+    volumes:
+      - zookeeper-data:/data
+      - zookeeper-datalog:/datalog
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - flink-net
+    restart: unless-stopped
+
   mysql:
     image: mysql:8.0
     container_name: mysql
@@ -43,7 +63,10 @@ services:
         cluster.fine-grained-resource-management.enabled: false
     volumes:
       - ./jars:/opt/flink/usrlib:Z
+      - flink-ha:/opt/flink/ha
     depends_on:
+      zookeeper:
+        condition: service_healthy
       mysql:
         condition: service_healthy
     command: jobmanager
@@ -64,8 +87,12 @@ services:
         cluster.fine-grained-resource-management.enabled: false
     volumes:
       - ./jars:/opt/flink/usrlib:Z
+      - flink-ha:/opt/flink/ha
     depends_on:
-      - jobmanager
+      zookeeper:
+        condition: service_healthy
+      jobmanager:
+        condition: service_started
     command: taskmanager
     networks:
       - flink-net
@@ -181,10 +208,15 @@ services:
       -Drest.port=8081"
     volumes:
       - ./jars:/opt/flink/usrlib:Z
+      - flink-ha:/opt/flink/ha
       - ./hms-config/hive-site.xml:/opt/hive/conf/hive-site.xml
     depends_on:
-      - jobmanager
-      - hive-metastore
+      zookeeper:
+        condition: service_healthy
+      jobmanager:
+        condition: service_started
+      hive-metastore:
+        condition: service_started
     networks:
       - flink-net
 
@@ -227,6 +259,9 @@ services:
 volumes:
   mysql-data:
   hms-db:
+  flink-ha:
+  zookeeper-data:
+  zookeeper-datalog:
 
 networks:
   flink-net:

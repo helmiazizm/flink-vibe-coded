@@ -19,6 +19,20 @@ execution:
     mode: "EXACTLY_ONCE"
     externalized-checkpoint-retention: "RETAIN_ON_CANCELLATION"
 
+# High Availability Configuration with Zookeeper
+high-availability:
+  type: "zookeeper"
+  storageDir: "s3://your-prod-bucket/flink-ha/"
+  zookeeper:
+    quorum: "your-zookeeper-host:2181"
+    path:
+      root: "/flink"
+    client:
+      session-timeout: "60s"
+      connection-timeout: "15s"
+      retry-wait: "5s"
+      max-retry-attempts: 3
+
 # S3 configuration for production
 s3:
   endpoint: "https://your-s3-endpoint.com"
