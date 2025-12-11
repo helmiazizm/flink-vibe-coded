@@ -40,7 +40,7 @@ setup-venv:
 	@python -m virtualenv .venv
 	@source .venv/bin/activate && \
 		pip install uv && \
-		uv pip install -r scripts/gateway_wrapper_requirements.txt
+		uv pip install -r scripts/requirements.txt
 
 
 # Build Docker images
