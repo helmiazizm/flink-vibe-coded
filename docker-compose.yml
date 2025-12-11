@@ -193,7 +193,7 @@ services:
       S3_ENDPOINT: http://seaweedfs-s3:8333
       S3_CREDENTIALS_PATH: /app/s3-config.json
     volumes:
-      - ./scripts/seaweedfs-bucket.py:/app/init_bucket.py
+      - ./scripts/seaweedfs_bucket.py:/app/init_bucket.py
       - ./seaweedfs/s3-config.json:/app/s3-config.json:ro
     command: sh -c "pip install --no-cache-dir boto3 && python init_bucket.py"
     depends_on:

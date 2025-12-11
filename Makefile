@@ -33,8 +33,15 @@ help:
 	@echo "  - SeaweedFS Volume (9093) - Storage volumes"
 
 # Run setup script
-setup:
+setup-misc:
 	@bash scripts/setup.sh
+
+setup-venv:
+	@python -m virtualenv .venv
+	@source .venv/bin/activate && \
+		pip install uv && \
+		uv pip install -r scripts/gateway_wrapper_requirements.txt
+
 
 # Build Docker images
 build:

@@ -14,7 +14,7 @@ echo "=================================================="
 # Create directories
 echo ""
 echo "Creating directories..."
-mkdir -p jars mysql-init flink-jobs seaweedfs/master-data seaweedfs/volume-data seaweedfs/filer-data flink-storage
+mkdir -p jars mysql-init flink-jobs seaweedfs/master-data seaweedfs/volume-data seaweedfs/filer-data
 
 # Download JARs
 download_jars() {
