@@ -6,3 +6,4 @@ seaweedfs/volume-data
 cdc-setup
 flink-jobs/paimon-init-prod.sql
 flink_python_prod.ipynb
+flink-config/flink-conf-prod.yml

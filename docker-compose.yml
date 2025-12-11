@@ -44,7 +44,10 @@ services:
         cluster.fine-grained-resource-management.enabled: false
     volumes:
       - ./jars:/opt/flink/usrlib:Z
-    command: jobmanager
+      - flink-rocksdb:/opt/flink/rocksdb
+      - ./flink-config/flink-conf-${FLINK_ENV:-dev}.yml:/opt/flink/conf/checkpointing.yaml:ro
+    command: >
+      bash -c "cat /opt/flink/conf/checkpointing.yaml >> /opt/flink/conf/config.yaml && ./bin/jobmanager.sh start-foreground"
     networks:
       - flink-net
 
@@ -60,9 +63,12 @@ services:
         cluster.fine-grained-resource-management.enabled: false
     volumes:
       - ./jars:/opt/flink/usrlib:Z
+      - flink-rocksdb:/opt/flink/rocksdb
+      - ./flink-config/flink-conf-${FLINK_ENV:-dev}.yml:/opt/flink/conf/checkpointing.yaml:ro
     depends_on:
       - jobmanager
-    command: taskmanager
+    command: >
+      bash -c "cat /opt/flink/conf/checkpointing.yaml >> /opt/flink/conf/config.yaml && ./bin/taskmanager.sh start-foreground"
     networks:
       - flink-net
     deploy:
@@ -75,8 +81,12 @@ services:
     container_name: flink-sql-gateway
     ports:
       - "8081:8083"
+    volumes:
+      - ./jars:/opt/flink/usrlib:Z
+      - flink-rocksdb:/opt/flink/rocksdb
+      - ./flink-config/flink-conf-${FLINK_ENV:-dev}.yml:/opt/flink/conf/checkpointing.yaml:ro
     command: >
-      bash -c "./bin/sql-gateway.sh start-foreground 
+      bash -c "cat /opt/flink/conf/checkpointing.yaml >> /opt/flink/conf/flink-conf.yaml && ./bin/sql-gateway.sh start-foreground 
       -Dsql-gateway.endpoint.rest.address=0.0.0.0 
       -Dsql-gateway.endpoint.rest.port=8083
       -Dsql-gateway.session.idle-timeout=2h
@@ -84,8 +94,6 @@ services:
       -Djobmanager.rpc.address=jobmanager
       -Drest.address=jobmanager
       -Drest.port=8081"
-    volumes:
-      - ./jars:/opt/flink/usrlib:Z
     depends_on:
       - jobmanager
     networks:
@@ -200,6 +208,7 @@ services:
 
 volumes:
   mysql-data:
+  flink-rocksdb:
 
 networks:
   flink-net:

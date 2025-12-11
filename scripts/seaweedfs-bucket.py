@@ -5,7 +5,7 @@ credentials_path = os.getenv('S3_CREDENTIALS_PATH', '../seaweedfs/s3-config.json
 credentials = json.load(open(credentials_path))\
                 .get('identities', [None])[0]\
                 .get('credentials', [None])[0]
-bucket_names = ['paimon-data', 'flink-checkpoints']
+bucket_names = ['paimon-data', 'flink-state-persistent']
 endpoint = os.getenv('S3_ENDPOINT', 'http://localhost:9095')
 
 client = boto3.client(

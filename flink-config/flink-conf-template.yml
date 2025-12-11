@@ -1,0 +1,32 @@
+state:
+  checkpoints:
+    dir: "s3://your-prod-bucket/flink-checkpoints/"
+  savepoints:
+    dir: "s3://your-prod-bucket/flink-savepoints/"
+  backend:
+    rocksdb:
+      localdir: "/opt/flink/rocksdb"
+      timer-service:
+        factory: "rocksdb"
+  checkpoint-storage: "filesystem"
+
+execution:
+  checkpointing:
+    interval: "30s"
+    min-pause: "5s"
+    timeout: "10min"
+    max-concurrent-checkpoints: 1
+    mode: "EXACTLY_ONCE"
+    externalized-checkpoint-retention: "RETAIN_ON_CANCELLATION"
+
+# S3 configuration for production
+s3:
+  endpoint: "https://your-s3-endpoint.com"
+  access-key: "your-production-access-key"
+  secret-key: "your-production-secret-key"
+  path:
+    style:
+      access: true
+  trust:
+    all:
+      certificates: false

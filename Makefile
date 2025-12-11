@@ -43,18 +43,28 @@ build:
 	@echo "Build complete!"
 
 # Start all services
-start:
+start-dev:
 	@echo "Starting all services..."
-	docker compose up -d
+	docker compose -f docker-compose.yml -f docker-compose-dev.yml --profile dev up -d
 	@echo "Waiting for services to be ready..."
-	sleep 20
+	@echo "Services started. Paimon catalog will be initialized automatically."
+	@make status
+
+start-prod:
+	@echo "Starting all services in production mode..."
+	docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d
+	@echo "Waiting for services to be ready..."
 	@echo "Services started. Paimon catalog will be initialized automatically."
 	@make status
 
 # Stop all services
-stop:
+stop-dev:
 	@echo "Stopping all services..."
-	docker compose down
+	docker compose -f docker-compose.yml -f docker-compose-dev.yml --profile dev down
+
+stop-prod:
+	@echo "Stopping all services..."
+	docker compose -f docker-compose.yml -f docker-compose-prod.yml down
 
 # Restart all services
 restart:

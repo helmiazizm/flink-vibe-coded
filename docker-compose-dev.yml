@@ -1,0 +1,12 @@
+services:
+  jobmanager:
+    environment:
+      - FLINK_ENV=dev
+
+  taskmanager:
+    environment:
+      - FLINK_ENV=dev
+
+  sql-gateway:
+    environment:
+      - FLINK_ENV=dev

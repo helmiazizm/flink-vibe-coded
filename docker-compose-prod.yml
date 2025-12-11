@@ -1,0 +1,12 @@
+services:
+  jobmanager:
+    environment:
+      - FLINK_ENV=prod
+
+  taskmanager:
+    environment:
+      - FLINK_ENV=prod
+
+  sql-gateway:
+    environment:
+      - FLINK_ENV=prod

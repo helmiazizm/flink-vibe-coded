@@ -1,0 +1,31 @@
+state:
+  checkpoints:
+    dir: "s3://flink-state-persistent/checkpoints/"
+  savepoints:
+    dir: "s3://flink-state-persistent/savepoints/"
+  backend:
+    rocksdb:
+      localdir: "/opt/flink/rocksdb"
+      timer-service:
+        factory: "rocksdb"
+  checkpoint-storage: "filesystem"
+
+execution:
+  checkpointing:
+    interval: "30s"
+    min-pause: "5s"
+    timeout: "10min"
+    max-concurrent-checkpoints: 1
+    mode: "EXACTLY_ONCE"
+    externalized-checkpoint-retention: "RETAIN_ON_CANCELLATION"
+
+s3:
+  endpoint: "http://seaweedfs-s3:8333"
+  access-key: "paimonAdmin123"
+  secret-key: "paimonSecretKey456789abcdef"
+  path:
+    style:
+      access: true
+  trust:
+    all:
+      certificates: true
