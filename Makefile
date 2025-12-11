@@ -124,7 +124,7 @@ start-dev:
 	@echo "⏳ Waiting for services to initialize..."
 	@sleep 3
 	@echo ""
-	@make status
+	@make status-dev
 
 stop-dev:
 	@echo "🛑 Stopping development environment..."
@@ -144,7 +144,7 @@ start-prod:
 	@echo "⏳ Waiting for services to initialize..."
 	@sleep 3
 	@echo ""
-	@make status
+	@make status-prod
 
 stop-prod:
 	@echo "🛑 Stopping production environment..."
@@ -199,16 +199,15 @@ status-hive:
 # MONITORING
 # ============================================================================
 
-status:
+status-dev:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  Service Status"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@docker compose ps
+	@docker compose -f docker-compose.yml -f docker-compose-dev.yml --profile dev ps
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  Access Points"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "  🔷 Zookeeper:         localhost:2181 (HA coordination)"
 	@echo "  🌐 Flink Web UI:      http://localhost:8080"
 	@echo "  🔌 Flink SQL Gateway: http://localhost:8081"
 	@echo "  🗄️  MySQL:             mysql -h localhost -P 3306 -u flink -pflink123 testdb"
@@ -216,6 +215,19 @@ status:
 	@echo "  💾 SeaweedFS Volume:  http://localhost:9093"
 	@echo "  📁 SeaweedFS Filer:   http://localhost:9094"
 	@echo "  🪣 SeaweedFS S3:      http://localhost:9095"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+status-prod:
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Service Status"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@docker compose -f docker-compose.yml -f docker-compose-prod.yml ps
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Access Points"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  🌐 Flink Web UI:      http://localhost:8080"
+	@echo "  🔌 Flink SQL Gateway: http://localhost:8081"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 logs:

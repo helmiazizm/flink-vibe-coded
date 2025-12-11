@@ -92,13 +92,13 @@ services:
       - flink-rocksdb:/opt/flink/rocksdb
       - flink-ha:/opt/flink/ha
       - ./flink-config/flink-conf-${FLINK_ENV:-dev}.yml:/opt/flink/conf/checkpointing.yaml:ro
+    command: >
+      bash -c "cat /opt/flink/conf/checkpointing.yaml >> /opt/flink/conf/config.yaml && ./bin/taskmanager.sh start-foreground"
     depends_on:
       zookeeper:
         condition: service_healthy
       jobmanager:
         condition: service_started
-    command: >
-      bash -c "cat /opt/flink/conf/checkpointing.yaml >> /opt/flink/conf/config.yaml && ./bin/taskmanager.sh start-foreground"
     networks:
       - flink-net
     deploy:
