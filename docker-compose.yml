@@ -23,6 +23,8 @@ services:
       retries: 10
     networks:
       - flink-net
+    profiles:
+      - dev
 
   jobmanager:
     build:
@@ -42,9 +44,6 @@ services:
         cluster.fine-grained-resource-management.enabled: false
     volumes:
       - ./jars:/opt/flink/usrlib:Z
-    depends_on:
-      mysql:
-        condition: service_healthy
     command: jobmanager
     networks:
       - flink-net
@@ -69,98 +68,6 @@ services:
     deploy:
       replicas: 3
 
-  master:
-    image: chrislusf/seaweedfs:3.99
-    container_name: seaweedfs-master
-    command: master -ip=master -ip.bind=0.0.0.0
-    ports:
-      - "9092:9333"
-    volumes:
-      - ./seaweedfs/master-data:/data
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9333/cluster/status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-    networks:
-      - flink-net
-
-  volume:
-    image: chrislusf/seaweedfs:3.99
-    container_name: seaweedfs-volume
-    command: volume -ip=volume -mserver=master:9333 -ip.bind=0.0.0.0 -port=8080
-    ports:
-      - "9093:8080"
-    volumes:
-      - ./seaweedfs/volume-data:/data
-    depends_on:
-      master:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-    networks:
-      - flink-net
-
-  filer:
-    image: chrislusf/seaweedfs:3.99
-    container_name: seaweedfs-filer
-    command: filer -ip=filer -master=master:9333 -ip.bind=0.0.0.0
-    ports:
-      - "9094:8888"
-    volumes:
-      - ./seaweedfs/filer-data:/data
-    depends_on:
-      master:
-        condition: service_healthy
-      volume:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8888/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-    networks:
-      - flink-net
-
-  s3:
-    image: chrislusf/seaweedfs:3.99
-    container_name: seaweedfs-s3
-    command: s3 -filer=filer:8888 -ip.bind=0.0.0.0 -config=/etc/seaweedfs/s3-config.json
-    ports:
-      - "9095:8333"
-    volumes:
-      - ./seaweedfs/s3-config.json:/etc/seaweedfs/s3-config.json:ro
-    depends_on:
-      filer:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - flink-net
-
-  s3-init:
-    image: python:3.13-alpine
-    container_name: seaweedfs-s3-init
-    working_dir: /app
-    environment:
-      S3_ENDPOINT: http://seaweedfs-s3:8333
-      S3_CREDENTIALS_PATH: /app/s3-config.json
-    volumes:
-      - ./scripts/seaweedfs-bucket.py:/app/init_bucket.py
-      - ./seaweedfs/s3-config.json:/app/s3-config.json:ro
-    command: sh -c "pip install --no-cache-dir boto3 && python init_bucket.py"
-    depends_on:
-      s3:
-        condition: service_started
-    restart: "no"
-    networks:
-      - flink-net
-
   sql-gateway:
     build:
       context: .
@@ -183,6 +90,113 @@ services:
       - jobmanager
     networks:
       - flink-net
+
+  master:
+    image: chrislusf/seaweedfs:3.99
+    container_name: seaweedfs-master
+    command: master -ip=master -ip.bind=0.0.0.0
+    ports:
+      - "9092:9333"
+    volumes:
+      - ./seaweedfs/master-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9333/cluster/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - flink-net
+    profiles:
+      - local-s3
+      - dev
+
+  volume:
+    image: chrislusf/seaweedfs:3.99
+    container_name: seaweedfs-volume
+    command: volume -ip=volume -mserver=master:9333 -ip.bind=0.0.0.0 -port=8080
+    ports:
+      - "9093:8080"
+    volumes:
+      - ./seaweedfs/volume-data:/data
+    depends_on:
+      master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - flink-net
+    profiles:
+      - local-s3
+      - dev
+
+  filer:
+    image: chrislusf/seaweedfs:3.99
+    container_name: seaweedfs-filer
+    command: filer -ip=filer -master=master:9333 -ip.bind=0.0.0.0
+    ports:
+      - "9094:8888"
+    volumes:
+      - ./seaweedfs/filer-data:/data
+    depends_on:
+      master:
+        condition: service_healthy
+      volume:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8888/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - flink-net
+    profiles:
+      - local-s3
+      - dev
+
+  s3:
+    image: chrislusf/seaweedfs:3.99
+    container_name: seaweedfs-s3
+    command: s3 -filer=filer:8888 -ip.bind=0.0.0.0 -config=/etc/seaweedfs/s3-config.json
+    ports:
+      - "9095:8333"
+    volumes:
+      - ./seaweedfs/s3-config.json:/etc/seaweedfs/s3-config.json:ro
+    depends_on:
+      filer:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - flink-net
+    profiles:
+      - local-s3
+      - dev
+
+  s3-init:
+    image: python:3.13-alpine
+    container_name: seaweedfs-s3-init
+    working_dir: /app
+    environment:
+      S3_ENDPOINT: http://seaweedfs-s3:8333
+      S3_CREDENTIALS_PATH: /app/s3-config.json
+    volumes:
+      - ./scripts/seaweedfs-bucket.py:/app/init_bucket.py
+      - ./seaweedfs/s3-config.json:/app/s3-config.json:ro
+    command: sh -c "pip install --no-cache-dir boto3 && python init_bucket.py"
+    depends_on:
+      s3:
+        condition: service_started
+    restart: "no"
+    networks:
+      - flink-net
+    profiles:
+      - local-s3
+      - dev
 
 volumes:
   mysql-data:
