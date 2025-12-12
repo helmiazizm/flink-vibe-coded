@@ -15,6 +15,9 @@ services:
         jobmanager.memory.process.size: 2g
         jobmanager.scheduler: Default
         cluster.fine-grained-resource-management.enabled: false
+        rest.address: jobmanager
+        rest.bind-address: 0.0.0.0
+        rest.port: 8081
     volumes:
       - ./jars:/opt/flink/usrlib:Z
     command: >
@@ -32,6 +35,9 @@ services:
         jobmanager.rpc.address: jobmanager
         taskmanager.memory.process.size: 2g
         cluster.fine-grained-resource-management.enabled: false
+        rest.address: jobmanager
+        rest.bind-address: 0.0.0.0
+        rest.port: 8081
     volumes:
       - ./jars:/opt/flink/usrlib:Z
     command: >
@@ -59,6 +65,7 @@ services:
       -Dsql-gateway.session.check-interval=30min
       -Djobmanager.rpc.address=jobmanager
       -Drest.address=jobmanager
+      -Drest.bind-address=0.0.0.0
       -Drest.port=8081"
     depends_on:
       jobmanager:
