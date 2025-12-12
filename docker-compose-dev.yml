@@ -30,6 +30,8 @@ services:
     container_name: jobmanager
     environment:
       - FLINK_ENV=dev
+    volumes:
+      - ./flink-config/flink-conf-dev.yml:/opt/flink/conf/checkpointing.yml:ro
     depends_on:
       s3-init:
         condition: service_completed_successfully
@@ -38,6 +40,8 @@ services:
     container_name: taskmanager
     environment:
       - FLINK_ENV=dev
+    volumes:
+      - ./flink-config/flink-conf-dev.yml:/opt/flink/conf/checkpointing.yml:ro
     depends_on:
       s3-init:
         condition: service_completed_successfully
@@ -46,6 +50,8 @@ services:
     container_name: sql-gateway
     environment:
       - FLINK_ENV=dev
+    volumes:
+      - ./flink-config/flink-conf-dev.yml:/opt/flink/conf/checkpointing.yml:ro
     depends_on:
       s3-init:
         condition: service_completed_successfully
