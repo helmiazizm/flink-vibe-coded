@@ -1,12 +1,16 @@
 services:
   jobmanager:
+    container_name: jobmanager
     environment:
       - FLINK_ENV=prod
 
   taskmanager:
     environment:
       - FLINK_ENV=prod
+    deploy:
+      replicas: 3
 
   sql-gateway:
+    container_name: sql-gateway
     environment:
       - FLINK_ENV=prod

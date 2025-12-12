@@ -1,0 +1,50 @@
+services:
+  zookeeper:
+    image: zookeeper:3.9.3
+    container_name: zookeeper
+    hostname: zookeeper
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_SERVERS: server.1=zookeeper:2888:3888;2181
+      ZOO_4LW_COMMANDS_WHITELIST: "*"
+    volumes:
+      - zookeeper-data:/data
+      - zookeeper-datalog:/datalog
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - flink-net
+    restart: unless-stopped
+
+  jobmanager:
+    volumes:
+      - flink-rocksdb:/opt/flink/rocksdb
+      - flink-ha:/opt/flink/ha
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+
+  taskmanager:
+    volumes:
+      - flink-rocksdb:/opt/flink/rocksdb
+      - flink-ha:/opt/flink/ha
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+
+  sql-gateway:
+    volumes:
+      - flink-rocksdb:/opt/flink/rocksdb
+      - flink-ha:/opt/flink/ha
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+
+volumes:
+  zookeeper-data:
+  zookeeper-datalog:
+  flink-rocksdb:
+  flink-ha:

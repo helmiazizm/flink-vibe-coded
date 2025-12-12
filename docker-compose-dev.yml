@@ -1,5 +1,33 @@
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: flink
+      MYSQL_PASSWORD: flink123
+    volumes:
+      - ./mysql-init:/docker-entrypoint-initdb.d:Z
+      - mysql-data:/var/lib/mysql
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --server-id=1 --log-bin=mysql-bin --binlog-format=ROW --binlog-row-image=FULL
+      --gtid-mode=ON --enforce-gtid-consistency=ON
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot123"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - flink-net
+    restart: unless-stopped
+
   jobmanager:
+    container_name: jobmanager
     environment:
       - FLINK_ENV=dev
     depends_on:
@@ -7,6 +35,7 @@ services:
         condition: service_completed_successfully
 
   taskmanager:
+    container_name: taskmanager
     environment:
       - FLINK_ENV=dev
     depends_on:
@@ -14,8 +43,113 @@ services:
         condition: service_completed_successfully
 
   sql-gateway:
+    container_name: sql-gateway
     environment:
       - FLINK_ENV=dev
     depends_on:
       s3-init:
         condition: service_completed_successfully
+
+  master:
+    image: chrislusf/seaweedfs:3.99
+    container_name: seaweedfs-master
+    command: master -ip=master -ip.bind=0.0.0.0
+    ports:
+      - "9092:9333"
+    volumes:
+      - seaweedfs-master-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9333/cluster/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - flink-net
+
+  volume:
+    image: chrislusf/seaweedfs:3.99
+    container_name: seaweedfs-volume
+    command: volume -ip=volume -mserver=master:9333 -ip.bind=0.0.0.0 -port=8080
+    ports:
+      - "9093:8080"
+    volumes:
+      - seaweedfs-volume-data:/data
+    depends_on:
+      master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - flink-net
+
+  filer:
+    image: chrislusf/seaweedfs:3.99
+    container_name: seaweedfs-filer
+    command: filer -ip=filer -master=master:9333 -ip.bind=0.0.0.0
+    ports:
+      - "9094:8888"
+    volumes:
+      - seaweedfs-filer-data:/data
+    depends_on:
+      master:
+        condition: service_healthy
+      volume:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8888/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - flink-net
+
+  s3:
+    image: chrislusf/seaweedfs:3.99
+    container_name: seaweedfs-s3
+    command: s3 -filer=filer:8888 -ip.bind=0.0.0.0 -config=/etc/seaweedfs/s3-config.json
+    ports:
+      - "9095:8333"
+    volumes:
+      - ./seaweedfs/s3-config.json:/etc/seaweedfs/s3-config.json:ro
+    depends_on:
+      filer:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8333"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - flink-net
+
+  s3-init:
+    image: python:3.13-alpine
+    container_name: seaweedfs-s3-init
+    working_dir: /app
+    environment:
+      S3_ENDPOINT: http://seaweedfs-s3:8333
+      S3_CREDENTIALS_PATH: /app/s3-config.json
+    volumes:
+      - ./scripts/seaweedfs_bucket.py:/app/init_bucket.py
+      - ./seaweedfs/s3-config.json:/app/s3-config.json:ro
+    command: sh -c "pip install --no-cache-dir boto3 && python init_bucket.py"
+    depends_on:
+      s3:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - flink-net
+
+volumes:
+  mysql-data:
+  seaweedfs-master-data:
+  seaweedfs-volume-data:
+  seaweedfs-filer-data:

@@ -1,5 +1,6 @@
 jars
 .env
+.venv
 seaweedfs/filer-data
 seaweedfs/master-data
 seaweedfs/volume-data
@@ -8,3 +9,4 @@ flink-jobs/paimon-init-prod.sql
 flink_python_prod.ipynb
 flink-config/flink-conf-prod.yml
 *__pycache__
+.zookeeper_enabled

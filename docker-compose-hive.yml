@@ -1,56 +1,11 @@
 services:
-  zookeeper:
-    image: zookeeper:3.9.3
-    container_name: zookeeper
-    hostname: zookeeper
-    environment:
-      ZOO_MY_ID: 1
-      ZOO_SERVERS: server.1=zookeeper:2888:3888;2181
-      ZOO_4LW_COMMANDS_WHITELIST: "*"
-    volumes:
-      - zookeeper-data:/data
-      - zookeeper-datalog:/datalog
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - flink-net
-    restart: unless-stopped
-
-  mysql:
-    image: mysql:8.0
-    container_name: mysql
-    ports:
-      - "3306:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: root123
-      MYSQL_DATABASE: testdb
-      MYSQL_USER: flink
-      MYSQL_PASSWORD: flink123
-    volumes:
-      - ./mysql-init:/docker-entrypoint-initdb.d:Z
-      - mysql-data:/var/lib/mysql
-    command: >
-      --default-authentication-plugin=mysql_native_password
-      --server-id=1 --log-bin=mysql-bin --binlog-format=ROW --binlog-row-image=FULL
-      --gtid-mode=ON --enforce-gtid-consistency=ON
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot123"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks:
-      - flink-net
-
   jobmanager:
     build:
       context: .
       dockerfile: FlinkHive.Dockerfile
     container_name: jobmanager
     ports:
-      - "8081:8081"
+      - "8080:8081"
       - "6123:6123"
     environment:
       - |
@@ -63,12 +18,6 @@ services:
         cluster.fine-grained-resource-management.enabled: false
     volumes:
       - ./jars:/opt/flink/usrlib:Z
-      - flink-ha:/opt/flink/ha
-    depends_on:
-      zookeeper:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
     command: jobmanager
     networks:
       - flink-net
@@ -77,7 +26,6 @@ services:
     build:
       context: .
       dockerfile: FlinkHive.Dockerfile
-    container_name: taskmanager
     environment:
       - | 
         FLINK_PROPERTIES=
@@ -87,105 +35,10 @@ services:
         cluster.fine-grained-resource-management.enabled: false
     volumes:
       - ./jars:/opt/flink/usrlib:Z
-      - flink-ha:/opt/flink/ha
     depends_on:
-      zookeeper:
-        condition: service_healthy
       jobmanager:
         condition: service_started
     command: taskmanager
-    networks:
-      - flink-net
-
-  master:
-    image: chrislusf/seaweedfs:3.99
-    container_name: seaweedfs-master
-    command: master -ip=master -ip.bind=0.0.0.0
-    ports:
-      - "9092:9333"
-    volumes:
-      - ./seaweedfs/master-data:/data
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9333/cluster/status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-    networks:
-      - flink-net
-
-  volume:
-    image: chrislusf/seaweedfs:3.99
-    container_name: seaweedfs-volume
-    command: volume -ip=volume -mserver=master:9333 -ip.bind=0.0.0.0 -port=8080
-    ports:
-      - "9093:8080"
-    volumes:
-      - ./seaweedfs/volume-data:/data
-    depends_on:
-      master:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-    networks:
-      - flink-net
-
-  filer:
-    image: chrislusf/seaweedfs:3.99
-    container_name: seaweedfs-filer
-    command: filer -ip=filer -master=master:9333 -ip.bind=0.0.0.0
-    ports:
-      - "9094:8888"
-    volumes:
-      - ./seaweedfs/filer-data:/data
-    depends_on:
-      master:
-        condition: service_healthy
-      volume:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8888/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-    networks:
-      - flink-net
-
-  s3:
-    image: chrislusf/seaweedfs:3.99
-    container_name: seaweedfs-s3
-    command: s3 -filer=filer:8888 -ip.bind=0.0.0.0 -config=/etc/seaweedfs/s3-config.json
-    ports:
-      - "9095:8333"
-    volumes:
-      - ./seaweedfs/s3-config.json:/etc/seaweedfs/s3-config.json:ro
-    depends_on:
-      filer:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - flink-net
-
-  s3-init:
-    image: python:3.13-alpine
-    container_name: seaweedfs-s3-init
-    working_dir: /app
-    environment:
-      S3_ENDPOINT: http://seaweedfs-s3:8333
-      S3_CREDENTIALS_PATH: /app/s3-config.json
-    volumes:
-      - ./scripts/seaweedfs_bucket.py:/app/init_bucket.py
-      - ./seaweedfs/s3-config.json:/app/s3-config.json:ro
-    command: sh -c "pip install --no-cache-dir boto3 && python init_bucket.py"
-    depends_on:
-      s3:
-        condition: service_started
-    restart: "no"
     networks:
       - flink-net
 
@@ -197,7 +50,7 @@ services:
     ports:
       - "10000:10000"
     command: >
-      bash -c "./bin/sql-gateway.sh start-foreground 
+      bash -c "cat /opt/flink/conf/checkpointing.yml >> /opt/flink/conf/config.yaml && ./bin/sql-gateway.sh start-foreground  
       -Dsql-gateway.endpoint.type=hiveserver2
       -Dsql-gateway.endpoint.hiveserver2.thrift.host=0.0.0.0
       -Dsql-gateway.endpoint.hiveserver2.thrift.port=10000
@@ -207,12 +60,10 @@ services:
       -Drest.address=jobmanager
       -Drest.port=8081"
     volumes:
+      - ./flink-config/flink-conf-hive.yml:/opt/flink/conf/checkpointing.yml:ro
       - ./jars:/opt/flink/usrlib:Z
-      - flink-ha:/opt/flink/ha
       - ./hms-config/hive-site.xml:/opt/hive/conf/hive-site.xml
     depends_on:
-      zookeeper:
-        condition: service_healthy
       jobmanager:
         condition: service_started
       hive-metastore:
@@ -257,11 +108,7 @@ services:
       - flink-net
 
 volumes:
-  mysql-data:
   hms-db:
-  flink-ha:
-  zookeeper-data:
-  zookeeper-datalog:
 
 networks:
   flink-net:

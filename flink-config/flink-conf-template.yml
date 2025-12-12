@@ -1,8 +1,8 @@
 state:
   checkpoints:
-    dir: "s3://your-prod-bucket/flink-checkpoints/"
+    dir: "s3://flink-state-persistent/checkpoints/"
   savepoints:
-    dir: "s3://your-prod-bucket/flink-savepoints/"
+    dir: "s3://flink-state-persistent/savepoints/"
   backend:
     rocksdb:
       localdir: "/opt/flink/rocksdb"
@@ -19,28 +19,13 @@ execution:
     mode: "EXACTLY_ONCE"
     externalized-checkpoint-retention: "RETAIN_ON_CANCELLATION"
 
-# High Availability Configuration with Zookeeper
-high-availability:
-  type: "zookeeper"
-  storageDir: "s3://your-prod-bucket/flink-ha/"
-  zookeeper:
-    quorum: "your-zookeeper-host:2181"
-    path:
-      root: "/flink"
-    client:
-      session-timeout: "60s"
-      connection-timeout: "15s"
-      retry-wait: "5s"
-      max-retry-attempts: 3
-
-# S3 configuration for production
 s3:
-  endpoint: "https://your-s3-endpoint.com"
-  access-key: "your-production-access-key"
-  secret-key: "your-production-secret-key"
+  endpoint: "http://seaweedfs-s3:8333"
+  access-key: "paimonAdmin123"
+  secret-key: "paimonSecretKey456789abcdef"
   path:
     style:
       access: true
   trust:
     all:
-      certificates: false
+      certificates: true
