@@ -1,8 +1,8 @@
 services:
   jobmanager:
     build:
-      context: .
-      dockerfile: FlinkHive.Dockerfile
+      context: ..
+      dockerfile: docker/FlinkHive.Dockerfile
     container_name: jobmanager
     ports:
       - "8080:8081"
@@ -17,15 +17,17 @@ services:
         jobmanager.scheduler: Default
         cluster.fine-grained-resource-management.enabled: false
     volumes:
-      - ./jars:/opt/flink/usrlib:Z
-    command: jobmanager
+      - ../jars:/opt/flink/usrlib:Z
+      - ../flink-config/flink-conf-hive.yml:/opt/flink/conf/checkpointing.yml:ro
+    command: >
+      bash -c "cat /opt/flink/conf/checkpointing.yml >> /opt/flink/conf/config.yaml && ./bin/jobmanager.sh start-foreground"
     networks:
       - flink-net
 
   taskmanager:
     build:
-      context: .
-      dockerfile: FlinkHive.Dockerfile
+      context: ..
+      dockerfile: docker/FlinkHive.Dockerfile
     environment:
       - | 
         FLINK_PROPERTIES=
@@ -34,18 +36,20 @@ services:
         taskmanager.numberOfTaskSlots: 2
         cluster.fine-grained-resource-management.enabled: false
     volumes:
-      - ./jars:/opt/flink/usrlib:Z
+      - ../jars:/opt/flink/usrlib:Z
+      - ../flink-config/flink-conf-hive.yml:/opt/flink/conf/checkpointing.yml:ro
     depends_on:
       jobmanager:
         condition: service_started
-    command: taskmanager
+    command: >
+      bash -c "cat /opt/flink/conf/checkpointing.yml >> /opt/flink/conf/config.yaml && ./bin/taskmanager.sh start-foreground"
     networks:
       - flink-net
 
   sql-gateway:
     build:
-      context: .
-      dockerfile: FlinkHive.Dockerfile
+      context: ..
+      dockerfile: docker/FlinkHive.Dockerfile
     container_name: sql-gateway
     ports:
       - "10000:10000"
@@ -60,9 +64,9 @@ services:
       -Drest.address=jobmanager
       -Drest.port=8081"
     volumes:
-      - ./flink-config/flink-conf-hive.yml:/opt/flink/conf/checkpointing.yml:ro
-      - ./jars:/opt/flink/usrlib:Z
-      - ./hms-config/hive-site.xml:/opt/hive/conf/hive-site.xml
+      - ../flink-config/flink-conf-hive.yml:/opt/flink/conf/checkpointing.yml:ro
+      - ../jars:/opt/flink/usrlib:Z
+      - ../hms-config/hive-site.xml:/opt/hive/conf/hive-site.xml
     depends_on:
       jobmanager:
         condition: service_started

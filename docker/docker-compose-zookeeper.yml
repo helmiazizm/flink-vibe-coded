@@ -48,3 +48,8 @@ volumes:
   zookeeper-datalog:
   flink-rocksdb:
   flink-ha:
+
+networks:
+  flink-net:
+    driver: bridge
+    name: flink-net

@@ -104,12 +104,12 @@ setup-all: setup-misc setup-venv build
 
 build:
 	@echo "🔨 Building Docker images (Flink 1.20 + Java 17)..."
-	@docker compose build
+	@docker compose -f docker/docker-compose.yml build
 	@echo "✓ Build complete!"
 
 build-hive:
 	@echo "🐝 Building Docker images (Flink 1.20 + Java 8 for Hive)..."
-	@docker compose -f docker-compose-hive.yml build
+	@docker compose -f docker/docker-compose-hive.yml build
 	@echo "✓ Hive-compatible build complete!"
 
 # ============================================================================
@@ -117,34 +117,34 @@ build-hive:
 # ============================================================================
 
 ZOOKEEPER_DEV_FLAG_FILE := .zookeeper_enabled
-FLINK_DEV_CONFIG_FILE := ./flink-config/flink-conf-dev.yml
-FLINK_DEV_CONFIG_FILE_BACKUP := ./flink-config/flink-conf-dev.yml.bak
+FLINK_DEV_CONFIG_FILE_TEMPLATE := ./flink-config/flink-conf-dev.yml
+FLINK_DEV_CONFIG_FILE_STARTUP := ./flink-config/flink-conf-dev-startup.yml
 
 start-dev:
 	@echo "🚀 Starting development environment..."
+	@cp $(FLINK_DEV_CONFIG_FILE_TEMPLATE) $(FLINK_DEV_CONFIG_FILE_STARTUP);
 	@read -p "Use Zookeeper? (y/n): " use_zookeeper && \
 	if [ "$$use_zookeeper" = "y" ] || [ "$$use_zookeeper" = "Y" ]; then \
-		cp $(FLINK_DEV_CONFIG_FILE) $(FLINK_DEV_CONFIG_FILE_BACKUP); \
 		echo "true" > $(ZOOKEEPER_DEV_FLAG_FILE); \
 		echo "📝 Zookeeper enabled"; \
-		echo "" >> $(FLINK_DEV_CONFIG_FILE); \
-		echo "high-availability:" >> $(FLINK_DEV_CONFIG_FILE); \
-		echo '  type: "zookeeper"' >> $(FLINK_DEV_CONFIG_FILE); \
-		echo '  storageDir: "s3://flink-state-persistent/ha/"' >> $(FLINK_DEV_CONFIG_FILE); \
-		echo "  zookeeper:" >> $(FLINK_DEV_CONFIG_FILE); \
-		echo '    quorum: "zookeeper:2181"' >> $(FLINK_DEV_CONFIG_FILE); \
-		echo "    path:" >> $(FLINK_DEV_CONFIG_FILE); \
-		echo '      root: "/flink"' >> $(FLINK_DEV_CONFIG_FILE); \
-		echo "    client:" >> $(FLINK_DEV_CONFIG_FILE); \
-		echo '      session-timeout: "60s"' >> $(FLINK_DEV_CONFIG_FILE); \
-		echo '      connection-timeout: "15s"' >> $(FLINK_DEV_CONFIG_FILE); \
-		echo '      retry-wait: "5s"' >> $(FLINK_DEV_CONFIG_FILE); \
-		echo "      max-retry-attempts: 3" >> $(FLINK_DEV_CONFIG_FILE); \
-		docker compose -f docker-compose.yml -f docker-compose-dev.yml -f docker-compose-zookeeper.yml up -d; \
+		echo "" >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		echo "high-availability:" >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		echo '  type: "zookeeper"' >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		echo '  storageDir: "s3://flink-state-persistent/ha/"' >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		echo "  zookeeper:" >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		echo '    quorum: "zookeeper:2181"' >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		echo "    path:" >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		echo '      root: "/flink"' >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		echo "    client:" >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		echo '      session-timeout: "60s"' >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		echo '      connection-timeout: "15s"' >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		echo '      retry-wait: "5s"' >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		echo "      max-retry-attempts: 3" >> $(FLINK_DEV_CONFIG_FILE_STARTUP); \
+		docker compose -f docker/docker-compose.yml -f docker/docker-compose-dev.yml -f docker/docker-compose-zookeeper.yml up -d; \
 	else \
 		echo "false" > $(ZOOKEEPER_DEV_FLAG_FILE); \
 		echo "📝 Zookeeper disabled"; \
-		docker compose -f docker-compose.yml -f docker-compose-dev.yml up -d; \
+		docker compose -f docker/docker-compose.yml -f docker/docker-compose-dev.yml up -d; \
 	fi
 	@echo "⏳ Waiting for services to initialize..."
 	@sleep 3
@@ -155,15 +155,12 @@ stop-dev:
 	@echo "🛑 Stopping development environment..."
 	@if [ -f $(ZOOKEEPER_DEV_FLAG_FILE) ] && [ "$$(cat $(ZOOKEEPER_DEV_FLAG_FILE))" = "true" ]; then \
 		echo "📝 Stopping with Zookeeper..."; \
-		docker compose -f docker-compose.yml -f docker-compose-dev.yml -f docker-compose-zookeeper.yml down; \
+		docker compose -f docker/docker-compose.yml -f docker/docker-compose-dev.yml -f docker/docker-compose-zookeeper.yml down; \
 	else \
 		echo "📝 Stopping without Zookeeper..."; \
-		docker compose -f docker-compose.yml -f docker-compose-dev.yml down; \
+		docker compose -f docker/docker-compose.yml -f docker/docker-compose-dev.yml down; \
 	fi
-	@if [ -f $(FLINK_DEV_CONFIG_FILE_BACKUP) ]; then \
-		mv $(FLINK_DEV_CONFIG_FILE_BACKUP) $(FLINK_DEV_CONFIG_FILE); \
-	fi
-	@rm -f $(ZOOKEEPER_DEV_FLAG_FILE)
+	@rm -f $(ZOOKEEPER_DEV_FLAG_FILE) $(FLINK_DEV_CONFIG_FILE_STARTUP)
 	@echo "✓ Development environment stopped"
 
 restart-dev: stop-dev start-dev
@@ -175,7 +172,7 @@ restart-dev: stop-dev start-dev
 
 start-prod:
 	@echo "🏭 Starting production environment..."
-	@docker compose -f docker-compose.yml -f docker-compose-prod.yml -f docker-compose-zookeeper.yml up -d
+	@docker compose -f docker/docker-compose.yml -f docker/docker-compose-prod.yml -f docker/docker-compose-zookeeper.yml up -d
 	@echo "⏳ Waiting for services to initialize..."
 	@sleep 3
 	@echo ""
@@ -183,7 +180,7 @@ start-prod:
 
 stop-prod:
 	@echo "🛑 Stopping production environment..."
-	@docker compose -f docker-compose.yml -f docker-compose-prod.yml -f docker-compose-zookeeper.yml down
+	@docker compose -f docker/docker-compose.yml -f docker/docker-compose-prod.yml -f docker/docker-compose-zookeeper.yml down
 	@echo "✓ Production environment stopped"
 
 restart-prod: stop-prod start-prod
@@ -195,35 +192,35 @@ restart-prod: stop-prod start-prod
 
 # File to store zookeeper usage choice for Hive
 ZOOKEEPER_HIVE_FLAG_FILE := .zookeeper_hive_enabled
-FLINK_HIVE_CONFIG_FILE := ./flink-config/flink-conf-hive.yml
-FLINK_HIVE_CONFIG_FILE_BACKUP := ./flink-config/flink-conf-hive.yml.bak
+FLINK_HIVE_CONFIG_FILE_TEMPLATE := ./flink-config/flink-conf-hive.yml
+FLINK_HIVE_CONFIG_FILE_STARTUP := ./flink-config/flink-conf-hive-startup.yml
 
 start-hive:
 	@echo "🐝 Starting Hive environment (Flink 1.20 + Java 8)..."
 	@echo "   Includes: HiveServer2, Hive Metastore, PostgreSQL"
-	@read -p "Use Zookeeper for high availability? (y/n): " use_zookeeper && \
+	@cp $(FLINK_HIVE_CONFIG_FILE_TEMPLATE) $(FLINK_HIVE_CONFIG_FILE_STARTUP);
+	@read -p "Use Zookeeper for high availability? (y/n): " use_zookeeper && \ 
 	if [ "$$use_zookeeper" = "y" ] || [ "$$use_zookeeper" = "Y" ]; then \
-		cp $(FLINK_HIVE_CONFIG_FILE) $(FLINK_HIVE_CONFIG_FILE_BACKUP); \
 		echo "true" > $(ZOOKEEPER_HIVE_FLAG_FILE); \
 		echo "📝 Zookeeper enabled for Hive environment"; \
-		echo "" >> $(FLINK_HIVE_CONFIG_FILE); \
-		echo "high-availability:" >> $(FLINK_HIVE_CONFIG_FILE); \
-		echo '  type: "zookeeper"' >> $(FLINK_HIVE_CONFIG_FILE); \
-		echo '  storageDir: "s3://flink-state-persistent/ha/"' >> $(FLINK_HIVE_CONFIG_FILE); \
-		echo "  zookeeper:" >> $(FLINK_HIVE_CONFIG_FILE); \
-		echo '    quorum: "zookeeper:2181"' >> $(FLINK_HIVE_CONFIG_FILE); \
-		echo "    path:" >> $(FLINK_HIVE_CONFIG_FILE); \
-		echo '      root: "/flink"' >> $(FLINK_HIVE_CONFIG_FILE); \
-		echo "    client:" >> $(FLINK_HIVE_CONFIG_FILE); \
-		echo '      session-timeout: "60s"' >> $(FLINK_HIVE_CONFIG_FILE); \
-		echo '      connection-timeout: "15s"' >> $(FLINK_HIVE_CONFIG_FILE); \
-		echo '      retry-wait: "5s"' >> $(FLINK_HIVE_CONFIG_FILE); \
-		echo "      max-retry-attempts: 3" >> $(FLINK_HIVE_CONFIG_FILE); \
-		docker compose -f docker-compose-hive.yml -f docker-compose-dev.yml -f docker-compose-zookeeper.yml up -d; \
+		echo "" >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		echo "high-availability:" >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		echo '  type: "zookeeper"' >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		echo '  storageDir: "s3://flink-state-persistent/ha/"' >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		echo "  zookeeper:" >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		echo '    quorum: "zookeeper:2181"' >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		echo "    path:" >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		echo '      root: "/flink"' >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		echo "    client:" >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		echo '      session-timeout: "60s"' >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		echo '      connection-timeout: "15s"' >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		echo '      retry-wait: "5s"' >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		echo "      max-retry-attempts: 3" >> $(FLINK_HIVE_CONFIG_FILE_STARTUP); \
+		docker compose -f docker/docker-compose-hive.yml -f docker/docker-compose-dev.yml -f docker/docker-compose-zookeeper.yml up -d; \
 	else \
 		echo "false" > $(ZOOKEEPER_HIVE_FLAG_FILE); \
 		echo "📝 Zookeeper disabled for Hive environment"; \
-		docker compose -f docker-compose-hive.yml -f docker-compose-dev.yml up -d; \
+		docker compose -f docker/docker-compose-hive.yml -f docker/docker-compose-dev.yml up -d; \
 	fi
 	@echo "⏳ Waiting for services to initialize..."
 	@sleep 3
@@ -234,15 +231,12 @@ stop-hive:
 	@echo "🛑 Stopping Hive environment..."
 	@if [ -f $(ZOOKEEPER_HIVE_FLAG_FILE) ] && [ "$$(cat $(ZOOKEEPER_HIVE_FLAG_FILE))" = "true" ]; then \
 		echo "📝 Stopping Hive environment with Zookeeper..."; \
-		docker compose -f docker-compose-hive.yml -f docker-compose-dev.yml -f docker-compose-zookeeper.yml down; \
+		docker compose -f docker/docker-compose-hive.yml -f docker/docker-compose-dev.yml -f docker/docker-compose-zookeeper.yml down; \
 	else \
 		echo "📝 Stopping Hive environment without Zookeeper..."; \
-		docker compose -f docker-compose-hive.yml -f docker-compose-dev.yml down; \
+		docker compose -f docker/docker-compose-hive.yml -f docker/docker-compose-dev.yml down; \
 	fi
-	@if [ -f $(FLINK_HIVE_CONFIG_FILE_BACKUP) ]; then \
-		mv $(FLINK_HIVE_CONFIG_FILE_BACKUP) $(FLINK_HIVE_CONFIG_FILE); \
-	fi
-	@rm -f $(ZOOKEEPER_HIVE_FLAG_FILE)
+	@rm -f $(ZOOKEEPER_HIVE_FLAG_FILE) $(FLINK_HIVE_CONFIG_FILE_STARTUP)
 	@echo "✓ Hive environment stopped"
 
 restart-hive: stop-hive start-hive
@@ -253,9 +247,9 @@ status-hive:
 	@echo "  Hive Environment Status (Java 8)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@if [ -f $(ZOOKEEPER_HIVE_FLAG_FILE) ] && [ "$$(cat $(ZOOKEEPER_HIVE_FLAG_FILE))" = "true" ]; then \
-		docker compose -f docker-compose-hive.yml -f docker-compose-dev.yml -f docker-compose-zookeeper.yml ps; \
+		docker compose -f docker/docker-compose-hive.yml -f docker/docker-compose-dev.yml -f docker/docker-compose-zookeeper.yml ps; \
 	else \
-		docker compose -f docker-compose-hive.yml -f docker-compose-dev.yml ps; \
+		docker compose -f docker/docker-compose-hive.yml -f docker/docker-compose-dev.yml ps; \
 	fi
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -283,9 +277,9 @@ status-dev:
 	@echo "  Service Status"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@if [ -f $(ZOOKEEPER_DEV_FLAG_FILE) ] && [ "$$(cat $(ZOOKEEPER_DEV_FLAG_FILE))" = "true" ]; then \
-		docker compose -f docker-compose.yml -f docker-compose-dev.yml -f docker-compose-zookeeper.yml ps; \
+		docker compose -f docker/docker-compose.yml -f docker/docker-compose-dev.yml -f docker/docker-compose-zookeeper.yml ps; \
 	else \
-		docker compose -f docker-compose.yml -f docker-compose-dev.yml ps; \
+		docker compose -f docker/docker-compose.yml -f docker/docker-compose-dev.yml ps; \
 	fi
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -304,7 +298,7 @@ status-prod:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  Service Status"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@docker compose -f docker-compose.yml -f docker-compose-prod.yml -f docker-compose-zookeeper.yml ps
+	@docker compose -f docker/docker-compose.yml -f docker/docker-compose-prod.yml -f docker/docker-compose-zookeeper.yml ps
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  Access Points"
@@ -315,17 +309,17 @@ status-prod:
 
 logs:
 	@if [ -f $(ZOOKEEPER_DEV_FLAG_FILE) ] && [ "$$(cat $(ZOOKEEPER_DEV_FLAG_FILE))" = "true" ]; then \
-		docker compose -f docker-compose.yml -f docker-compose-dev.yml -f docker-compose-zookeeper.yml logs --tail=100; \
+		docker compose -f docker/docker-compose.yml -f docker/docker-compose-dev.yml -f docker/docker-compose-zookeeper.yml logs --tail=100; \
 	else \
-		docker compose -f docker-compose.yml -f docker-compose-dev.yml logs --tail=100; \
+		docker compose -f docker/docker-compose.yml -f docker/docker-compose-dev.yml logs --tail=100; \
 	fi
 
 logs-follow:
 	@echo "📋 Following logs (Ctrl+C to exit)..."
 	@if [ -f $(ZOOKEEPER_DEV_FLAG_FILE) ] && [ "$$(cat $(ZOOKEEPER_DEV_FLAG_FILE))" = "true" ]; then \
-		docker compose -f docker-compose.yml -f docker-compose-dev.yml -f docker-compose-zookeeper.yml logs -f; \
+		docker compose -f docker/docker-compose.yml -f docker/docker-compose-dev.yml -f docker/docker-compose-zookeeper.yml logs -f; \
 	else \
-		docker compose -f docker-compose.yml -f docker-compose-dev.yml logs -f; \
+		docker compose -f docker/docker-compose.yml -f docker/docker-compose-dev.yml logs -f; \
 	fi
 
 logs-service:
@@ -335,7 +329,7 @@ logs-service:
 		echo "   Available: jobmanager, taskmanager, sql-gateway, mysql, master, volume, filer, s3"; \
 		exit 1; \
 	fi
-	@docker compose logs -f $(SVC)
+	@docker compose -f docker/docker-compose.yml logs -f $(SVC)
 
 # ============================================================================
 # ACCESS SERVICES
@@ -381,9 +375,9 @@ zookeeper:
 clean:
 	@echo "🧹 Performing full cleanup..."
 	@echo "  • Stopping all environments..."
-	@docker compose -f docker-compose.yml -f docker-compose-dev.yml -f docker-compose-zookeeper.yml down -v --remove-orphans 2>/dev/null || true
-	@docker compose -f docker-compose.yml -f docker-compose-prod.yml -f docker-compose-zookeeper.yml down -v --remove-orphans 2>/dev/null || true
-	@docker compose -f docker-compose-hive.yml -f docker-compose-dev.yml -f docker-compose-zookeeper.yml down -v --remove-orphans 2>/dev/null || true
+	@docker compose -f docker/docker-compose.yml -f docker/docker-compose-dev.yml -f docker/docker-compose-zookeeper.yml down -v --remove-orphans 2>/dev/null || true
+	@docker compose -f docker/docker-compose.yml -f docker/docker-compose-prod.yml -f docker/docker-compose-zookeeper.yml down -v --remove-orphans 2>/dev/null || true
+	@docker compose -f docker/docker-compose-hive.yml -f docker/docker-compose-dev.yml -f docker/docker-compose-zookeeper.yml down -v --remove-orphans 2>/dev/null || true
 	@echo "  • Removing generated files..."
 	@rm -rf jars/*
 	@rm -f $(ZOOKEEPER_DEV_FLAG_FILE) $(ZOOKEEPER_HIVE_FLAG_FILE)
@@ -397,7 +391,7 @@ clean:
 
 clean-soft:
 	@echo "🧹 Soft cleanup (keeping volumes)..."
-	@docker compose down --remove-orphans
+	@docker compose -f docker/docker-compose.yml down --remove-orphans
 	@echo "✓ Containers removed (volumes preserved)"
 
 # ============================================================================
@@ -410,5 +404,5 @@ check-service:
 		echo "❌ Error: SVC variable not set"; \
 		exit 1; \
 	fi
-	@docker compose ps | grep $(SVC) | grep -q "Up" || \
+	@docker compose -f docker/docker-compose.yml ps | grep $(SVC) | grep -q "Up" || \
 		(echo "❌ Service $(SVC) is not running"; exit 1)

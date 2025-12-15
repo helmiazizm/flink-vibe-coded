@@ -7,6 +7,6 @@ RUN \
     tar -xzf flink-cdc-3.5.0-bin.tar.gz --strip-components=1 -C /opt/flink && \
     chown -R flink:flink /opt/flink
 
-COPY jars/* /opt/flink/lib/
+COPY ../jars/* /opt/flink/lib/
 
 USER flink

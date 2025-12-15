@@ -1,6 +1,7 @@
 jars
 .env
 .venv
+flink-config/flink-conf-*-startup.yml
 seaweedfs/filer-data
 seaweedfs/master-data
 seaweedfs/volume-data

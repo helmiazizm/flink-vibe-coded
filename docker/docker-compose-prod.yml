@@ -4,7 +4,7 @@ services:
     environment:
       - FLINK_ENV=prod
     volumes:
-      - ./flink-config/flink-conf-prod.yml:/opt/flink/conf/checkpointing.yml:ro
+      - ../flink-config/flink-conf-prod.yml:/opt/flink/conf/checkpointing.yml:ro
 
   taskmanager:
     environment:
@@ -12,11 +12,16 @@ services:
     deploy:
       replicas: 3
     volumes:
-      - ./flink-config/flink-conf-prod.yml:/opt/flink/conf/checkpointing.yml:ro
+      - ../flink-config/flink-conf-prod.yml:/opt/flink/conf/checkpointing.yml:ro
 
   sql-gateway:
     container_name: sql-gateway
     environment:
       - FLINK_ENV=prod
     volumes:
-      - ./flink-config/flink-conf-prod.yml:/opt/flink/conf/checkpointing.yml:ro
+      - ../flink-config/flink-conf-prod.yml:/opt/flink/conf/checkpointing.yml:ro
+
+networks:
+  flink-net:
+    driver: bridge
+    name: flink-net

@@ -1,8 +1,8 @@
 services:
   jobmanager:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: jobmanager
     ports:
       - "8080:8081"
@@ -19,7 +19,7 @@ services:
         rest.bind-address: 0.0.0.0
         rest.port: 8081
     volumes:
-      - ./jars:/opt/flink/usrlib:Z
+      - ../jars:/opt/flink/usrlib:Z
     command: >
       bash -c "cat /opt/flink/conf/checkpointing.yml >> /opt/flink/conf/config.yaml && ./bin/jobmanager.sh start-foreground"
     networks:
@@ -27,8 +27,8 @@ services:
 
   taskmanager:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     environment:
       - | 
         FLINK_PROPERTIES=
@@ -39,7 +39,7 @@ services:
         rest.bind-address: 0.0.0.0
         rest.port: 8081
     volumes:
-      - ./jars:/opt/flink/usrlib:Z
+      - ../jars:/opt/flink/usrlib:Z
     command: >
       bash -c "cat /opt/flink/conf/checkpointing.yml >> /opt/flink/conf/config.yaml && ./bin/taskmanager.sh start-foreground"
     depends_on:
@@ -50,13 +50,13 @@ services:
 
   sql-gateway:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: flink-sql-gateway
     ports:
       - "8081:8083"
     volumes:
-      - ./jars:/opt/flink/usrlib:Z
+      - ../jars:/opt/flink/usrlib:Z
     command: >
       bash -c "cat /opt/flink/conf/checkpointing.yml >> /opt/flink/conf/config.yaml && ./bin/sql-gateway.sh start-foreground 
       -Dsql-gateway.endpoint.rest.address=0.0.0.0 

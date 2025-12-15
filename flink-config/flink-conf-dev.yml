@@ -12,12 +12,20 @@ state:
 
 execution:
   checkpointing:
-    interval: "30s"
+    interval: "3s"
     min-pause: "5s"
     timeout: "10min"
     max-concurrent-checkpoints: 1
     mode: "EXACTLY_ONCE"
     externalized-checkpoint-retention: "RETAIN_ON_CANCELLATION"
+
+pipeline:
+  object-reuse: true
+
+table:
+  exec:
+    sink:
+      not-null-enforcer: "drop"
 
 s3:
   endpoint: "http://seaweedfs-s3:8333"

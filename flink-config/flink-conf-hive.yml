@@ -19,6 +19,14 @@ execution:
     mode: "EXACTLY_ONCE"
     externalized-checkpoint-retention: "RETAIN_ON_CANCELLATION"
 
+pipeline:
+  object-reuse: true
+
+table:
+  exec:
+    sink:
+      not-null-enforcer: "drop"
+
 s3:
   endpoint: "http://seaweedfs-s3:8333"
   access-key: "paimonAdmin123"
