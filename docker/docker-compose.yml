@@ -34,6 +34,9 @@ services:
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
         taskmanager.memory.process.size: 2g
+        taskmanager.memory.managed.fraction: 0.4
+        taskmanager.network.memory.min: 512mb
+        taskmanager.network.memory.max: 1gb
         cluster.fine-grained-resource-management.enabled: false
         rest.address: jobmanager
         rest.bind-address: 0.0.0.0

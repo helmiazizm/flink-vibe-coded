@@ -1,32 +1,56 @@
+# State Backend Configuration
 state:
-  checkpoints:
-    dir: "s3://flink-state-persistent/checkpoints/"
-  savepoints:
-    dir: "s3://flink-state-persistent/savepoints/"
   backend:
     rocksdb:
       localdir: "/opt/flink/rocksdb"
       timer-service:
         factory: "rocksdb"
+  # Use filesystem checkpoint storage
   checkpoint-storage: "filesystem"
+  # Directory for checkpoints
+  checkpoints:
+    dir: "s3://flink-state-persistent/checkpoints/"
+  # Directory for savepoints
+  savepoints:
+    dir: "s3://flink-state-persistent/savepoints/"
 
+# Execution Configuration
 execution:
   checkpointing:
-    interval: "3s"
-    min-pause: "5s"
-    timeout: "10min"
+    # Increase checkpoint interval to reduce overhead during CDC initialization
+    interval: "60s"
+    # Ensure minimum pause between checkpoints
+    min-pause: "30s"
+    # Longer timeout for large checkpoints
+    timeout: "20min"
+    # Allow only one checkpoint at a time
     max-concurrent-checkpoints: 1
+    # Exactly-once semantics
     mode: "EXACTLY_ONCE"
+    # Retain checkpoints on cancellation for debugging
     externalized-checkpoint-retention: "RETAIN_ON_CANCELLATION"
+    # Enable unaligned checkpoints for better performance under backpressure
+    unaligned: true
+    # Continue checkpointing after tasks finish
+    enable-checkpoints-after-tasks-finish: true
+  # Use batch mode for initial snapshot (faster startup)
+  runtime-mode: "STREAMING"
 
+# Pipeline Configuration
 pipeline:
+  # Enable object reuse for better performance
   object-reuse: true
+  # Increase parallelism for CDC operations
+  default-parallelism: 4
 
+# Table API Configuration
 table:
   exec:
     sink:
+      # Handle null values appropriately
       not-null-enforcer: "drop"
 
+# S3 Configuration
 s3:
   endpoint: "http://seaweedfs-s3:8333"
   access-key: "paimonAdmin123"
