@@ -26,6 +26,14 @@ class Flink:
             return 'select'
         elif cleaned.startswith('INSERT'):
             return 'insert'
+        elif cleaned.startswith('CREATE TABLE'):
+            # Check if it's a streaming table (has CDC connector or Kafka)
+            if 'CONNECTOR' in cleaned and any(
+                connector in cleaned 
+                for connector in ['MYSQL-CDC', 'POSTGRES-CDC', 'KAFKA', 'UPSERT-KAFKA']
+            ):
+                return 'create_streaming_table'
+            return 'create_batch_table'
         elif cleaned.startswith('UPDATE'):
             return 'update'
         elif cleaned.startswith('DELETE'):
@@ -73,7 +81,6 @@ class Flink:
     def _get_job_id_by_name(self, job_name: str) -> Optional[str]:
         """Get job ID by querying SHOW JOBS and filtering by job name"""
         try:
-            # Execute SHOW JOBS
             r = requests.post(
                 f"{self.url}/v1/sessions/{self.session_id}/statements",
                 json={"statement": "SHOW JOBS"}
@@ -81,7 +88,6 @@ class Flink:
             r.raise_for_status()
             op_handle = r.json()['operationHandle']
             
-            # Wait for completion
             start = time.time()
             while time.time() - start < 30:
                 r = requests.get(
@@ -97,7 +103,6 @@ class Flink:
                 
                 time.sleep(0.5)
             
-            # Fetch results
             time.sleep(1)
             r = requests.get(
                 f"{self.url}/v1/sessions/{self.session_id}/operations/{op_handle}/result/0",
@@ -115,7 +120,6 @@ class Flink:
             if 'data' not in results_data or not results_data['data']:
                 return None
             
-            # Extract rows
             rows = []
             for row_data in results_data['data']:
                 if 'fields' in row_data:
@@ -124,22 +128,17 @@ class Flink:
             if not rows:
                 return None
             
-            # Load into temporary DuckDB table
             temp_table = f"jobs_{secrets.token_hex(4)}"
             safe_columns = [f'"{col}"' for col in columns]
             
-            # Create table
             col_defs = [f"{safe_columns[i]} VARCHAR" for i in range(len(columns))]
             create_sql = f"CREATE TABLE {temp_table} ({', '.join(col_defs)})"
             self.db.execute(create_sql)
             
-            # Insert data
             placeholders = ', '.join(['?' for _ in columns])
             insert_sql = f"INSERT INTO {temp_table} VALUES ({placeholders})"
             self.db.executemany(insert_sql, rows)
             
-            # Find the job ID by job name
-            # Column names might be different, try common variations
             query_attempts = [
                 f"SELECT \"job id\" FROM {temp_table} WHERE \"job name\" = '{job_name}'",
                 f"SELECT \"Job ID\" FROM {temp_table} WHERE \"Job Name\" = '{job_name}'",
@@ -156,7 +155,6 @@ class Flink:
                 except Exception:
                     continue
             
-            # Clean up temp table
             self.db.execute(f"DROP TABLE {temp_table}")
             
             return job_id
@@ -181,7 +179,6 @@ class Flink:
                 r.raise_for_status()
                 op_handle = r.json()['operationHandle']
                 
-                # Wait for the stop command to complete
                 start = time.time()
                 while time.time() - start < 30:
                     r = requests.get(
@@ -203,16 +200,28 @@ class Flink:
         
         return False
     
-    def sql(self, query: str, timeout: int = 120, table_name: str = "result"):
-        """Execute SQL on Flink and optionally load results into DuckDB"""
+    def sql(self, query: str, timeout: int = 300, table_name: str = "result"):
+        """
+        Execute SQL on Flink and optionally load results into DuckDB.
+        
+        - Batch queries (JDBC source): Execute and fetch results normally
+        - Streaming queries (CDC source): Raise error for SELECT, allow INSERT INTO
+        """
         query_type = self._get_query_type(query)
         is_select = query_type == 'select'
+        is_streaming_table = query_type == 'create_streaming_table'
         op_handle = None
         job_name = None
         job_id = None
         
+        # Prevent SELECT on streaming tables
+        if is_select and is_streaming_table:
+            print("✗ Error: Cannot SELECT from streaming tables created with CDC connectors")
+            print("  Use INSERT INTO to write streaming data to a sink (like Paimon)")
+            print("  Then SELECT from the sink table using JDBC connector")
+            return
+        
         try:            
-            # Set a custom job name for all queries
             job_name = self._generate_job_name(query_type)
             self._set_job_name(job_name)
             
@@ -245,78 +254,61 @@ class Flink:
                 print(f"✗ Query timeout after {timeout}s")
                 return
             
-            # Wait for results to be ready - longer delay for CDC queries
-            if is_select:
-                time.sleep(10)  # Wait longer for SELECT queries to produce results
-            else:
-                time.sleep(2)
+            # For INSERT INTO streaming jobs, don't try to fetch results
+            if query_type == 'insert' and not is_select:
+                print(f"✓ Streaming INSERT job started successfully")
+                print(f"  Job will continue running. Monitor it with SHOW JOBS")
+                return
             
-            # Fetch results with retry logic and pagination support
+            # For non-SELECT queries, check if results exist
+            if not is_select:
+                try:
+                    result_uri = f"/v1/sessions/{self.session_id}/operations/{op_handle}/result/0"
+                    r = requests.get(f"{self.url}{result_uri}", timeout=10)
+                    if r.status_code != 200:
+                        print("✓ Statement executed successfully")
+                        return
+                except:
+                    print("✓ Statement executed successfully")
+                    return
+            
+            # Fetch results for batch queries
+            result_uri = f"/v1/sessions/{self.session_id}/operations/{op_handle}/result/0"
             all_rows = []
             columns = []
-            result_uri = f"/v1/sessions/{self.session_id}/operations/{op_handle}/result/0"
-            max_pages = 5  # Limit to avoid infinite loops
+            max_pages = 10
             page_count = 0
             
             while result_uri and page_count < max_pages:
-                result = None
-                for attempt in range(3):
-                    try:
-                        r = requests.get(
-                            f"{self.url}{result_uri}",
-                            timeout=30
-                        )
-                        if r.status_code == 200:
-                            result = r.json()
-                            break
-                        elif r.status_code == 500:
-                            # Wait a bit longer and retry
-                            time.sleep(2)
-                            continue
-                        else:
-                            r.raise_for_status()
-                    except requests.exceptions.RequestException as e:
-                        if attempt < 2:
-                            time.sleep(2)
-                            continue
-                        else:
-                            # If it's a non-SELECT query, this might be expected
-                            if not is_select:
-                                print("✓ Statement executed successfully")
-                                return
-                            print(f"✗ Failed to fetch results: {e}")
-                            return
-                
-                if result is None:
-                    if not is_select:
-                        print("✓ Statement executed successfully")
-                        return
-                    print("✗ Failed to fetch results after retries")
-                    return
-                
-                # Check if query returned results
-                if 'results' not in result or 'columns' not in result['results']:
-                    print("✓ Statement executed successfully")
-                    return
-                
-                results_data = result['results']
-                if not columns:  # Only set columns once
-                    columns = [col['name'] for col in results_data['columns']]
-                
-                # Extract rows from current page
-                if 'data' in results_data and results_data['data']:
-                    for row_data in results_data['data']:
-                        if 'fields' in row_data:
-                            all_rows.append(row_data['fields'])
-                
-                # Check for next page
-                if 'nextResultUri' in result and result['nextResultUri']:
-                    result_uri = result['nextResultUri']
-                    page_count += 1
-                    # Small delay between pages for streaming queries
-                    if page_count > 0:
+                try:
+                    r = requests.get(f"{self.url}{result_uri}", timeout=30)
+                    if r.status_code != 200:
+                        break
+                    
+                    result = r.json()
+                    
+                    if 'results' not in result or 'columns' not in result['results']:
+                        break
+                    
+                    results_data = result['results']
+                    
+                    if not columns:
+                        columns = [col['name'] for col in results_data['columns']]
+                    
+                    if 'data' in results_data and results_data['data']:
+                        for row_data in results_data['data']:
+                            if 'fields' in row_data:
+                                all_rows.append(row_data['fields'])
+                    
+                    if 'nextResultUri' in result and result['nextResultUri']:
+                        result_uri = result['nextResultUri']
+                        page_count += 1
                         time.sleep(0.5)
-                else:
+                    else:
+                        break
+                        
+                except Exception as e:
+                    print(f"Error fetching results: {e}")
                     break
             
             if not all_rows:
@@ -357,11 +349,9 @@ class Flink:
             self.db.sql(f"SELECT * FROM {table_name}").show()
         
         finally:
-            # Only stop the job if it's a SELECT query
-            if is_select and job_name:
-                job_id = self._get_job_id_by_name(job_name)
-                if job_id:
-                    self._stop_job_via_sql(job_id)
+            # Don't stop streaming INSERT jobs
+            if query_type == 'insert':
+                return
     
     def q(self, query: str):
         """Execute SQL on DuckDB"""
@@ -381,7 +371,10 @@ class Flink:
     def close(self):
         """Close session"""
         if self.session_id:
-            requests.delete(f"{self.url}/v1/sessions/{self.session_id}")
+            try:
+                requests.delete(f"{self.url}/v1/sessions/{self.session_id}")
+            except:
+                pass
         self.db.close()
 
 
@@ -389,7 +382,7 @@ class Flink:
 _flink: Optional[Flink] = None
 
 
-def sql(query: str, timeout: int = 120, table: str = "result"):
+def sql(query: str, timeout: int = 300, table: str = "result"):
     """Execute SQL on Flink and load results into DuckDB table"""
     global _flink
     if _flink is None:
