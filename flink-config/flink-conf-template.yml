@@ -12,15 +12,23 @@ state:
 
 execution:
   checkpointing:
-    interval: "30s"
-    min-pause: "5s"
-    timeout: "10min"
+    interval: "60s"
+    min-pause: "30s"
+    timeout: "20min"
     max-concurrent-checkpoints: 1
     mode: "EXACTLY_ONCE"
     externalized-checkpoint-retention: "RETAIN_ON_CANCELLATION"
+    unaligned: false
+    enable-checkpoints-after-tasks-finish: true
 
 pipeline:
   object-reuse: true
+  default-parallelism: 4
+
+table:
+  exec:
+    sink:
+      not-null-enforcer: "drop"
 
 table:
   exec:
