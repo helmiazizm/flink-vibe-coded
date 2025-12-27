@@ -63,6 +63,7 @@ help:
 	@echo "  make flink             Open Flink SQL client (interactive)"
 	@echo "  make sql-gateway       Test SQL Gateway connection (REST API)"
 	@echo "  make hive-gateway      Test HiveServer2 Gateway (Hive mode only)"
+	@echo "  make cdc-gateway       Test CDC Gateway connection"
 	@echo "  make zookeeper         Check Zookeeper status and HA nodes"
 	@echo ""
 	@echo "🧹 CLEANUP"
@@ -74,6 +75,7 @@ help:
 	@echo "    • Zookeeper:         localhost:2181 (HA coordination)"
 	@echo "    • Flink Web UI:      http://localhost:8080"
 	@echo "    • Flink SQL Gateway: http://localhost:8081"
+	@echo "    • CDC Gateway:       http://localhost:5001"
 	@echo "    • MySQL:             localhost:3306 (user: flink / flink123)"
 	@echo "    • SeaweedFS Master:  localhost:9092"
 	@echo "    • SeaweedFS Volume:  localhost:9093"
@@ -259,6 +261,7 @@ status-hive:
 		echo "  🔷 Zookeeper:          localhost:2181 (HA coordination)"; \
 	fi
 	@echo "  🌐 Flink Web UI:       http://localhost:8080"
+	@echo "  📝 CDC Gateway:        http://localhost:5000"
 	@echo "  🐝 HiveServer2:        jdbc:hive2://localhost:10000"
 	@echo "  🗄️  Hive Metastore:     thrift://localhost:9083"
 	@echo "  🗄️  MySQL:              mysql -h localhost -P 3306 -u flink -pflink123 testdb"
@@ -285,8 +288,19 @@ status-dev:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  Access Points"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  🌐 Flink Web UI:       http://localhost:8080"
+	@echo "  📝 CDC Gateway:        http://localhost:5000"
+	@echo "  🐝 HiveServer2:        jdbc:hive2://localhost:10000"
+	@echo "  🗄️  Hive Metastore:     thrift://localhost:9083"
+	@echo "  🗄️  MySQL:              mysql -h localhost -P 3306 -u flink -pflink123 testdb"
+	@echo "  📦 SeaweedFS Master:   http://localhost:9092"
+	@echo "  💾 SeaweedFS Volume:   http://localhost:9093"
+	@echo "  📁 SeaweedFS Filer:    http://localhost:9094"
+	@echo "  🪣 SeaweedFS S3:       http://localhost:9095"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  🌐 Flink Web UI:      http://localhost:8080"
 	@echo "  🔌 Flink SQL Gateway: http://localhost:8081"
+	@echo "  📝 CDC Gateway:       http://localhost:5001"
 	@echo "  🗄️  MySQL:             mysql -h localhost -P 3306 -u flink -pflink123 testdb"
 	@echo "  📦 SeaweedFS Master:  http://localhost:9092"
 	@echo "  💾 SeaweedFS Volume:  http://localhost:9093"
@@ -305,6 +319,7 @@ status-prod:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  🌐 Flink Web UI:      http://localhost:8080"
 	@echo "  🔌 Flink SQL Gateway: http://localhost:8081"
+	@echo "  📝 CDC Gateway:       http://localhost:5001"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 logs:
@@ -367,6 +382,15 @@ zookeeper:
 	@echo "📋 Flink HA nodes in Zookeeper:"
 	@docker exec -it zookeeper zkCli.sh ls /flink 2>/dev/null | grep -v "Connecting\|WATCHER\|WatchedEvent" || \
 		echo "❌ Cannot connect to Zookeeper or /flink path doesn't exist"
+
+cdc-gateway:
+	@echo "📝 Testing CDC Gateway connection..."
+	@curl -s http://localhost:5001/health | python3 -m json.tool || \
+		echo "❌ CDC Gateway not responding at http://localhost:5001"
+	@echo ""
+	@echo "📋 List of submitted CDC jobs:"
+	@curl -s http://localhost:5001/jobs | python3 -m json.tool || \
+		echo "❌ Failed to retrieve jobs"
 
 # ============================================================================
 # CLEANUP

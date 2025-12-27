@@ -18,6 +18,7 @@ services:
         cluster.fine-grained-resource-management.enabled: false
     volumes:
       - ../jars:/opt/flink/usrlib:Z
+      - cdc-yaml:/shared/cdc-yaml:Z
       - ../flink-config/flink-conf-hive.yml:/opt/flink/conf/checkpointing.yml:ro
     command: >
       bash -c "cat /opt/flink/conf/checkpointing.yml >> /opt/flink/conf/config.yaml && ./bin/jobmanager.sh start-foreground"
@@ -29,7 +30,7 @@ services:
       context: ..
       dockerfile: docker/FlinkHive.Dockerfile
     environment:
-      - | 
+      - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
         taskmanager.memory.process.size: 2g
@@ -37,6 +38,7 @@ services:
         cluster.fine-grained-resource-management.enabled: false
     volumes:
       - ../jars:/opt/flink/usrlib:Z
+      - cdc-yaml:/shared/cdc-yaml:Z
       - ../flink-config/flink-conf-hive.yml:/opt/flink/conf/checkpointing.yml:ro
     depends_on:
       jobmanager:
@@ -54,7 +56,7 @@ services:
     ports:
       - "10000:10000"
     command: >
-      bash -c "cat /opt/flink/conf/checkpointing.yml >> /opt/flink/conf/config.yaml && ./bin/sql-gateway.sh start-foreground  
+      bash -c "cat /opt/flink/conf/checkpointing.yml >> /opt/flink/conf/config.yaml && ./bin/sql-gateway.sh start-foreground
       -Dsql-gateway.endpoint.type=hiveserver2
       -Dsql-gateway.endpoint.hiveserver2.thrift.host=0.0.0.0
       -Dsql-gateway.endpoint.hiveserver2.thrift.port=10000
@@ -64,6 +66,7 @@ services:
       -Drest.address=jobmanager
       -Drest.port=8081"
     volumes:
+      - cdc-yaml:/shared/cdc-yaml:Z
       - ../flink-config/flink-conf-hive.yml:/opt/flink/conf/checkpointing.yml:ro
       - ../jars:/opt/flink/usrlib:Z
       - ../hms-config/hive-site.xml:/opt/hive/conf/hive-site.xml
@@ -74,6 +77,26 @@ services:
         condition: service_started
     networks:
       - flink-net
+
+  cdc-gateway:
+    build:
+      context: ..
+      dockerfile: docker/CdcGateway.Dockerfile
+    container_name: flink-cdc-gateway
+    ports:
+      - "5001:5000"
+    volumes:
+      - cdc-yaml:/shared/cdc-yaml:Z
+      - /var/run/docker.sock:/var/run/docker.sock:Z
+      - ../cdc_gateway:/app:Z
+    environment:
+      - FLASK_ENV=production
+    depends_on:
+      jobmanager:
+        condition: service_started
+    networks:
+      - flink-net
+    restart: unless-stopped
 
   hive-metastore:
     image: apache/hive:3.1.3
@@ -113,6 +136,7 @@ services:
 
 volumes:
   hms-db:
+  cdc-yaml:
 
 networks:
   flink-net:

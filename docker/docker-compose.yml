@@ -20,6 +20,7 @@ services:
         rest.port: 8081
     volumes:
       - ../jars:/opt/flink/usrlib:Z
+      - cdc-yaml:/shared/cdc-yaml:Z
     command: >
       bash -c "cat /opt/flink/conf/checkpointing.yml >> /opt/flink/conf/config.yaml && ./bin/jobmanager.sh start-foreground"
     networks:
@@ -43,6 +44,7 @@ services:
         rest.port: 8081
     volumes:
       - ../jars:/opt/flink/usrlib:Z
+      - cdc-yaml:/shared/cdc-yaml:Z
     command: >
       bash -c "cat /opt/flink/conf/checkpointing.yml >> /opt/flink/conf/config.yaml && ./bin/taskmanager.sh start-foreground"
     depends_on:
@@ -76,7 +78,31 @@ services:
     networks:
       - flink-net
 
+  cdc-gateway:
+    build:
+      context: ..
+      dockerfile: docker/CdcGateway.Dockerfile
+    container_name: flink-cdc-gateway
+    ports:
+      - "5001:5000"
+    volumes:
+      - cdc-yaml:/shared/cdc-yaml:Z
+      - /var/run/docker.sock:/var/run/docker.sock:Z
+      - ../cdc_gateway:/app:Z
+    environment:
+      - FLASK_ENV=production
+    depends_on:
+      jobmanager:
+        condition: service_started
+    networks:
+      - flink-net
+    restart: unless-stopped
+
 networks:
   flink-net:
     driver: bridge
     name: flink-net
+
+volumes:
+  cdc-yaml:
+    driver: local

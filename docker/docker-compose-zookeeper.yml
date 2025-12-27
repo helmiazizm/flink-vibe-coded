@@ -21,6 +21,7 @@ services:
 
   jobmanager:
     volumes:
+      - cdc-yaml:/shared/cdc-yaml:Z
       - flink-rocksdb:/opt/flink/rocksdb
       - flink-ha:/opt/flink/ha
     depends_on:
@@ -29,6 +30,7 @@ services:
 
   taskmanager:
     volumes:
+      - cdc-yaml:/shared/cdc-yaml:Z
       - flink-rocksdb:/opt/flink/rocksdb
       - flink-ha:/opt/flink/ha
     depends_on:
@@ -37,6 +39,7 @@ services:
 
   sql-gateway:
     volumes:
+      - cdc-yaml:/shared/cdc-yaml:Z
       - flink-rocksdb:/opt/flink/rocksdb
       - flink-ha:/opt/flink/ha
     depends_on:
@@ -48,6 +51,7 @@ volumes:
   zookeeper-datalog:
   flink-rocksdb:
   flink-ha:
+  cdc-yaml:
 
 networks:
   flink-net:

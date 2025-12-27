@@ -4,6 +4,7 @@ services:
     environment:
       - FLINK_ENV=prod
     volumes:
+      - cdc-yaml:/shared/cdc-yaml:Z
       - ../flink-config/flink-conf-prod.yml:/opt/flink/conf/checkpointing.yml:ro
 
   taskmanager:
@@ -12,6 +13,7 @@ services:
     deploy:
       replicas: 3
     volumes:
+      - cdc-yaml:/shared/cdc-yaml:Z
       - ../flink-config/flink-conf-prod.yml:/opt/flink/conf/checkpointing.yml:ro
 
   sql-gateway:
@@ -19,9 +21,13 @@ services:
     environment:
       - FLINK_ENV=prod
     volumes:
+      - cdc-yaml:/shared/cdc-yaml:Z
       - ../flink-config/flink-conf-prod.yml:/opt/flink/conf/checkpointing.yml:ro
 
 networks:
   flink-net:
     driver: bridge
     name: flink-net
+
+volumes:
+  cdc-yaml:

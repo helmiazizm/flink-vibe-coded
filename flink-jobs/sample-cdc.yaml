@@ -1,0 +1,26 @@
+source:
+  type: mysql
+  name: MySQL Source
+  hostname: mysql
+  port: 3306
+  username: flink
+  password: flink123
+  database: testdb
+  table: orders
+  server-time-zone: UTC
+  server-id: 5400-5404
+  scan.incremental.snapshot.enabled: true
+
+sink:
+  type: paimon
+  name: Paimon Sink
+  warehouse: s3://flink-state-persistent/warehouse
+  database: testdb
+  table: orders_cdc
+  s3.endpoint: http://seaweedfs-s3:8333
+  s3.access-key: paimonAdmin123
+  s3.secret-key: paimonSecretKey456789abcdef
+
+pipeline:
+  name: MySQL to Paimon CDC Pipeline
+  parallelism: 4

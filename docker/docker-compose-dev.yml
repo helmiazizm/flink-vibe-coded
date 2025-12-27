@@ -32,6 +32,7 @@ services:
       - FLINK_ENV=dev
     volumes:
       - ../flink-config/flink-conf-dev-startup.yml:/opt/flink/conf/checkpointing.yml:ro
+      - cdc-yaml:/shared/cdc-yaml:Z
     depends_on:
       s3-init:
         condition: service_completed_successfully
@@ -42,6 +43,7 @@ services:
       - FLINK_ENV=dev
     volumes:
       - ../flink-config/flink-conf-dev-startup.yml:/opt/flink/conf/checkpointing.yml:ro
+      - cdc-yaml:/shared/cdc-yaml:Z
     depends_on:
       s3-init:
         condition: service_completed_successfully
@@ -154,11 +156,29 @@ services:
     networks:
       - flink-net
 
+  cdc-gateway:
+    container_name: flink-cdc-gateway
+    environment:
+      - FLASK_ENV=production
+    ports:
+      - "5001:5000"
+    volumes:
+      - cdc-yaml:/shared/cdc-yaml:Z
+      - /var/run/docker.sock:/var/run/docker.sock:Z
+      - ../cdc_gateway:/app:Z
+    depends_on:
+      jobmanager:
+        condition: service_started
+    networks:
+      - flink-net
+    restart: unless-stopped
+
 volumes:
   mysql-data:
   seaweedfs-master-data:
   seaweedfs-volume-data:
   seaweedfs-filer-data:
+  cdc-yaml:
 
 networks:
   flink-net:

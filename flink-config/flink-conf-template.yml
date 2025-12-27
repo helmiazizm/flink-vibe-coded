@@ -29,8 +29,3 @@ table:
   exec:
     sink:
       not-null-enforcer: "drop"
-
-table:
-  exec:
-    sink:
-      not-null-enforcer: "drop"
